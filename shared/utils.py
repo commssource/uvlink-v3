@@ -1,13 +1,13 @@
 # ============================================================================
-# shared/utils.py - Common utilities
+# shared/utils.py - Basic utilities
 # ============================================================================
 
 import subprocess
 import os
 import shutil
+import logging
 from datetime import datetime
 from pathlib import Path
-import logging
 from typing import Tuple
 from fastapi import HTTPException
 
@@ -58,8 +58,3 @@ def create_backup(config_path: str, backup_prefix: str = "config") -> str:
     except Exception as e:
         logger.error(f"Failed to create backup: {e}")
         raise HTTPException(status_code=500, detail=f"Backup failed: {str(e)}")
-
-def ensure_directories(*dirs: str) -> None:
-    """Ensure directories exist"""
-    for directory in dirs:
-        Path(directory).mkdir(parents=True, exist_ok=True)

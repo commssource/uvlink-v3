@@ -1,14 +1,24 @@
-from .auth import verify_api_key, get_current_user
-from .logging import setup_logging
-from .utils import execute_asterisk_command, create_backup
-from .database import get_db, Base
+# ============================================================================
+# shared/__init__.py - Simple exports
+# ============================================================================
 
-__all__ = [
-    "verify_api_key",
-    "get_current_user", 
-    "setup_logging",
-    "execute_asterisk_command",
-    "create_backup",
-    "get_db",
-    "Base"
-]
+# Empty for now, we'll add as we build
+
+# ============================================================================
+# shared/auth.py - Simple authentication
+# ============================================================================
+
+from fastapi import HTTPException, Depends, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from config import API_KEY
+
+security = HTTPBearer()
+
+def verify_api_key(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
+    """Verify API key authentication"""
+    if credentials.credentials != API_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid API key"
+        )
+    return credentials.credentials

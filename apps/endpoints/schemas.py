@@ -33,21 +33,23 @@ class EndpointBase(BaseModel):
 class EndpointCreate(EndpointBase):
     password: str = Field(..., min_length=8, max_length=128)
 
-class EndpointUpdate(EndpointBase):
-    password: Optional[str] = Field(None, min_length=8, max_length=128)
-
 class Endpoint(EndpointBase):
     password: str
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
-
-    class Config:
-        from_attributes = True  # For Pydantic v2 compatibility
 
 class EndpointsList(BaseModel):
     endpoints: List[Endpoint]
 
-class EndpointValidation(BaseModel):
-    endpoint_id: str
-    exists: bool
-    available: bool
+class StatusResponse(BaseModel):
+    success: bool
+    message: str
+    details: Optional[dict] = None
+
+class ReloadResponse(BaseModel):
+    success: bool
+    message: str
+    output: Optional[str] = None
+
+class ConfigResponse(BaseModel):
+    success: bool
+    config: str
+    timestamp: str

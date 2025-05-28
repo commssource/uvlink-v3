@@ -1,36 +1,23 @@
 # ============================================================================
-# main.py - Main FastAPI application
+# Updated main.py - Better error handling
 # ============================================================================
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 import uvicorn
+import logging
 
 from config import (
     APP_NAME, APP_VERSION, APP_DESCRIPTION,
-    CORS_ORIGINS, HOST, PORT, LOG_LEVEL, ENABLED_APPS
-)
-from shared.logging import setup_logging
-from shared.database import engine, Base
-from shared.utils import ensure_directories
-from config import ASTERISK_BACKUP_PATH
-
-# Import app routers
-from apps import (
-    endpoints_router,
-    dids_router, 
-    queues_router,
-    reports_router,
-    ivr_router,
-    system_router
+    CORS_ORIGINS, HOST, PORT, LOG_LEVEL
 )
 
-# Configure logging
-setup_logging()
+# Initialize database
+from shared.database import init_database
 
-# Create database tables
-Base.metadata.create_all(bind=engine)
+# Setup logging
+logging.basicConfig(level=getattr(logging, LOG_LEVEL.upper()))
+logger = logging.getLogger(__name__)
 
 # Create FastAPI app
 app = FastAPI(
@@ -50,40 +37,50 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount static files
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
-# Include routers based on enabled apps
-app.include_router(system_router)
-
-if "endpoints" in ENABLED_APPS:
+# Import endpoints router
+try:
+    from apps.endpoints.routes import router as endpoints_router
     app.include_router(endpoints_router, prefix="/api/v1")
+    logger.info("✅ Endpoints app loaded")
+except ImportError as e:
+    logger.error(f"❌ Failed to load endpoints app: {e}")
 
-if "dids" in ENABLED_APPS:
-    app.include_router(dids_router, prefix="/api/v1")
+@app.get("/")
+async def root():
+    return {
+        "message": f"{APP_NAME} is running",
+        "version": APP_VERSION,
+        "docs": "/docs"
+    }
 
-if "queues" in ENABLED_APPS:
-    app.include_router(queues_router, prefix="/api/v1")
-
-if "reports" in ENABLED_APPS:
-    app.include_router(reports_router, prefix="/api/v1")
-
-if "ivr" in ENABLED_APPS:
-    app.include_router(ivr_router, prefix="/api/v1")
+@app.get("/health")
+async def health_check():
+    try:
+        from shared.database import engine
+        # Quick connection test
+        with engine.connect():
+            pass
+        db_status = "connected"
+    except Exception as e:
+        db_status = f"error: {str(e)}"
+    
+    return {
+        "status": "healthy", 
+        "database": db_status,
+        "version": APP_VERSION
+    }
 
 # Startup event
 @app.on_event("startup")
 async def startup_event():
     """Initialize application on startup"""
-    # Ensure required directories exist
-    ensure_directories(ASTERISK_BACKUP_PATH, "logs", "static")
+    logger.info("🚀 Starting Asterisk Management Platform...")
+    
+    # Initialize database
+    if init_database():
+        logger.info("✅ Database ready")
+    else:
+        logger.warning("⚠️ Database initialization had issues")
 
 if __name__ == "__main__":
-    uvicorn.run(
-        "main:app",
-        host=HOST,
-        port=PORT,
-        reload=True,
-        log_level=LOG_LEVEL
-    )
-
+    uvicorn.run("main:app", host=HOST, port=PORT, reload=True, log_level=LOG_LEVEL)
