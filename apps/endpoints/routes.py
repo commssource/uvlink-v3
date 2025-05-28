@@ -1,10 +1,11 @@
 # ============================================================================
-# apps/endpoints/routes.py - Endpoint routes
+# apps/endpoints/routes.py - Fixed imports
 # ============================================================================
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
+import json
 
 from .schemas import Endpoint, EndpointCreate, EndpointUpdate, EndpointsList, EndpointValidation
 from .services import EndpointService
@@ -112,4 +113,3 @@ async def validate_endpoint_id(
         exists=exists,
         available=not exists
     )
-

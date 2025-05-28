@@ -1,5 +1,5 @@
 # ============================================================================
-# requirements.txt
+# requirements.txt - Updated for compatibility
 # ============================================================================
 
 fastapi==0.104.1
@@ -8,11 +8,12 @@ python-multipart==0.0.6
 pydantic==2.5.0
 sqlalchemy==2.0.23
 alembic==1.13.1
-psycopg2-binary==2.9.9  # For PostgreSQL
-aiomysql==0.2.0         # For MySQL
-aiosqlite==0.19.0       # For SQLite
 
-# Optional dependencies for specific features
+# Database drivers (choose based on your needs)
+aiosqlite==0.19.0       # For SQLite (development)
+psycopg2-binary==2.9.9  # For PostgreSQL (production)
+aiomysql==0.2.0         # For MySQL
+
+# Optional dependencies
 redis==5.0.1            # For caching
 celery==5.3.4           # For background tasks
-prometheus-client==0.19.0  # For metrics

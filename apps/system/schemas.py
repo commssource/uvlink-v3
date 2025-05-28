@@ -1,5 +1,5 @@
 # ============================================================================
-# apps/system/schemas.py - System schemas
+# apps/system/schemas.py - Fixed for Pydantic v2
 # ============================================================================
 
 from pydantic import BaseModel
@@ -10,6 +10,16 @@ class StatusResponse(BaseModel):
     success: bool
     message: str
     details: Optional[Dict[str, Any]] = None
+
+class ReloadResponse(BaseModel):
+    success: bool
+    message: str
+    output: Optional[str] = None
+
+class ConfigResponse(BaseModel):
+    success: bool
+    config: str
+    timestamp: datetime
 
 class BackupInfo(BaseModel):
     filename: str

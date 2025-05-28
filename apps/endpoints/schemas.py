@@ -1,20 +1,21 @@
 # ============================================================================
-# apps/endpoints/schemas.py - Endpoint Pydantic schemas
+# apps/endpoints/schemas.py - Fixed for Pydantic v2
 # ============================================================================
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional
 import re
 
 class EndpointBase(BaseModel):
-    id: str = Field(..., min_length=1, max_length=50, regex=r'^[a-zA-Z0-9_-]+$')
-    username: str = Field(..., min_length=1, max_length=50, regex=r'^[a-zA-Z0-9_@.-]+$')
-    context: str = Field(default="internal", regex=r'^[a-zA-Z0-9_-]+$')
+    id: str = Field(..., min_length=1, max_length=50, pattern=r'^[a-zA-Z0-9_-]+$')
+    username: str = Field(..., min_length=1, max_length=50, pattern=r'^[a-zA-Z0-9_@.-]+$')
+    context: str = Field(default="internal", pattern=r'^[a-zA-Z0-9_-]+$')
     codecs: List[str] = Field(default=["ulaw", "alaw"])
     max_contacts: int = Field(default=1, ge=1, le=10)
     callerid: Optional[str] = Field(None, max_length=100)
 
-    @validator('codecs')
+    @field_validator('codecs')
+    @classmethod
     def validate_codecs(cls, v):
         allowed_codecs = ['ulaw', 'alaw', 'g722', 'g729', 'gsm', 'opus']
         for codec in v:
@@ -22,7 +23,8 @@ class EndpointBase(BaseModel):
                 raise ValueError(f'Invalid codec: {codec}')
         return v
 
-    @validator('callerid')
+    @field_validator('callerid')
+    @classmethod
     def validate_callerid(cls, v):
         if v and not re.match(r'^[\w\s<>@.-]+$', v):
             raise ValueError('Invalid caller ID format')
@@ -38,6 +40,9 @@ class Endpoint(EndpointBase):
     password: str
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
+
+    class Config:
+        from_attributes = True  # For Pydantic v2 compatibility
 
 class EndpointsList(BaseModel):
     endpoints: List[Endpoint]
