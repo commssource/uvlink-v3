@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, validator
 from typing import List, Optional, Dict, Any, Union
 from datetime import datetime
 import re
@@ -168,16 +168,20 @@ class SimpleEndpoint(BaseModel):
     auth: Optional[AuthConfig] = None
     aor: Optional[AORConfig] = None
 
-    @validator('username')
-    def validate_username(cls, v, values):
+    @field_validator('username')
+    @classmethod
+    def validate_username(cls, v: Optional[str], info) -> Optional[str]:
         """Validate username is provided either directly or in auth"""
+        values = info.data
         if not v and not values.get('auth', {}).get('username'):
             raise ValueError('username must be provided either directly or in auth object')
         return v
 
-    @validator('password')
-    def validate_password(cls, v, values):
+    @field_validator('password')
+    @classmethod
+    def validate_password(cls, v: Optional[str], info) -> Optional[str]:
         """Validate password is provided either directly or in auth"""
+        values = info.data
         if not v and not values.get('auth', {}).get('password'):
             raise ValueError('password must be provided either directly or in auth object')
         return v
