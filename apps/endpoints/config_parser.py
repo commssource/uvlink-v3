@@ -25,6 +25,7 @@ class AdvancedPJSIPConfigParser:
         
         current_section = None
         section_comments = []
+        section_counter = {}  # Track number of sections with same name
         
         for line_num, line in enumerate(content.split('\n'), 1):
             line = line.rstrip()
@@ -38,6 +39,13 @@ class AdvancedPJSIPConfigParser:
             section_match = re.match(r'^\[([^\]]+)\]', line)
             if section_match:
                 current_section = section_match.group(1)
+                
+                # Handle duplicate section names
+                if current_section in self.sections:
+                    if current_section not in section_counter:
+                        section_counter[current_section] = 1
+                    section_counter[current_section] += 1
+                    current_section = f"{current_section}_{section_counter[current_section]}"
                 
                 # Store section in order
                 if current_section not in self.order:
@@ -253,48 +261,59 @@ class AdvancedPJSIPConfigParser:
         """List all endpoints with their full configuration"""
         endpoints = []
         
+        # First pass: collect all sections by type
+        endpoint_sections = {}
+        auth_sections = {}
+        aor_sections = {}
+        
         for section_name, section_data in self.sections.items():
-            if section_data.get('type') == 'endpoint':
-                # Get related auth section
-                auth_section = f"{section_name}_auth"
-                auth_data = self.sections.get(auth_section, {})
-                
-                # Get related AOR section
-                aor_section = f"{section_name}_aor"
-                aor_data = self.sections.get(aor_section, {})
-                
-                # Build complete endpoint info
-                endpoint_info = {
-                    'id': section_name,
-                    'type': section_data.get('type', 'endpoint'),
-                    'entity_type': 'endpoint',
-                    'name': section_data.get('name', f'Extension {section_name}'),
-                    'context': section_data.get('context', 'internal'),
-                    'allow': section_data.get('allow', 'ulaw,alaw'),
-                    'disallow': section_data.get('disallow', 'all'),
-                    'transport': section_data.get('transport', 'transport-udp'),
-                    'callerid': section_data.get('callerid', ''),
-                    'webrtc': section_data.get('webrtc', 'no'),
-                    'auth': {
-                        'type': auth_data.get('type', 'auth'),
-                        'auth_type': auth_data.get('auth_type', 'userpass'),
-                        'username': auth_data.get('username', section_name),
-                        'password': auth_data.get('password', ''),
-                        'realm': auth_data.get('realm', 'UVLink')
-                    },
-                    'aor': {
-                        'type': aor_data.get('type', 'aor'),
-                        'max_contacts': int(aor_data.get('max_contacts', 2)),
-                        'qualify_frequency': int(aor_data.get('qualify_frequency', 60)) if aor_data.get('qualify_frequency') else 60
-                    }
+            section_type = section_data.get('type')
+            if section_type == 'endpoint':
+                endpoint_sections[section_name] = section_data
+            elif section_type == 'auth':
+                auth_sections[section_name] = section_data
+            elif section_type == 'aor':
+                aor_sections[section_name] = section_data
+        
+        # Second pass: build complete endpoint info
+        for section_name, section_data in endpoint_sections.items():
+            # Get related auth and aor sections
+            auth_data = auth_sections.get(section_name, {})
+            aor_data = aor_sections.get(section_name, {})
+            
+            # Build complete endpoint info
+            endpoint_info = {
+                'id': section_name,
+                'type': section_data.get('type', 'endpoint'),
+                'entity_type': 'endpoint',
+                'name': section_data.get('name', f'Extension {section_name}'),
+                'context': section_data.get('context', 'internal'),
+                'allow': section_data.get('allow', 'ulaw,alaw'),
+                'disallow': section_data.get('disallow', 'all'),
+                'transport': section_data.get('transport', 'transport-udp'),
+                'callerid': section_data.get('callerid', ''),
+                'webrtc': section_data.get('webrtc', 'no'),
+                'auth': {
+                    'type': auth_data.get('type', 'auth'),
+                    'auth_type': auth_data.get('auth_type', 'userpass'),
+                    'username': auth_data.get('username', section_name),
+                    'password': auth_data.get('password', ''),
+                    'realm': auth_data.get('realm', 'UVLink')
+                },
+                'aor': {
+                    'type': aor_data.get('type', 'aor'),
+                    'max_contacts': int(aor_data.get('max_contacts', 2)),
+                    'qualify_frequency': int(aor_data.get('qualify_frequency', 60)) if aor_data.get('qualify_frequency') else 60,
+                    'remove_unavailable': aor_data.get('remove_unavailable', 'no')
                 }
-                
-                # Add all other endpoint properties
-                for key, value in section_data.items():
-                    if key not in ['type', 'auth', 'aors'] and key not in endpoint_info:
-                        endpoint_info[key] = value
-                
-                endpoints.append(endpoint_info)
+            }
+            
+            # Add all other endpoint properties
+            for key, value in section_data.items():
+                if key not in ['type', 'auth', 'aors'] and key not in endpoint_info:
+                    endpoint_info[key] = value
+            
+            endpoints.append(endpoint_info)
         
         return endpoints
     
@@ -355,52 +374,61 @@ class AdvancedPJSIPConfigParser:
         try:
             endpoint_id = endpoint_data['id']
             
-            # Create endpoint section
-            endpoint_section = f"[{endpoint_id}]\n"
-            endpoint_section += "type=endpoint\n"
+            # First check if endpoint exists by scanning file
+            with open(self.config_path, 'r') as f:
+                content = f.read()
+                if f'[{endpoint_id}]' in content:
+                    logger.warning(f"Endpoint {endpoint_id} already exists")
+                    return False
+            
+            # Create backup
+            from shared.utils import create_backup
+            create_backup(self.config_path, f"pjsip_add_{endpoint_id}")
+            
+            # Prepare new sections
+            new_sections = []
+            
+            # Add endpoint section
+            new_sections.append(f"[{endpoint_id}]")
+            new_sections.append("type=endpoint")
             
             # Add basic fields
             for key, value in endpoint_data.items():
                 if key not in ['id', 'type', 'auth', 'aor'] and value is not None:
-                    endpoint_section += f"{key}={value}\n"
+                    new_sections.append(f"{key}={value}")
             
-            # Add auth reference
+            # Add auth section if provided
             if 'auth' in endpoint_data:
                 auth_data = endpoint_data['auth']
                 auth_id = auth_data.get('id', endpoint_id)  # Use endpoint ID if not specified
-                endpoint_section += f"auth={auth_id}\n"
+                new_sections.append(f"auth={auth_id}")
                 
                 # Create auth section
-                auth_section = f"[{auth_id}]\n"
-                auth_section += "type=auth\n"
+                new_sections.append(f"\n[{auth_id}]")
+                new_sections.append("type=auth")
                 for key, value in auth_data.items():
                     if key not in ['id', 'type'] and value is not None:
-                        auth_section += f"{key}={value}\n"
-                
-                # Add auth section to config
-                self.config += f"\n{auth_section}"
+                        new_sections.append(f"{key}={value}")
             
-            # Add AOR reference
+            # Add AOR section if provided
             if 'aor' in endpoint_data:
                 aor_data = endpoint_data['aor']
                 aor_id = aor_data.get('id', endpoint_id)  # Use endpoint ID if not specified
-                endpoint_section += f"aors={aor_id}\n"
+                new_sections.append(f"aors={aor_id}")
                 
                 # Create AOR section
-                aor_section = f"[{aor_id}]\n"
-                aor_section += "type=aor\n"
+                new_sections.append(f"\n[{aor_id}]")
+                new_sections.append("type=aor")
                 for key, value in aor_data.items():
                     if key not in ['id', 'type'] and value is not None:
-                        aor_section += f"{key}={value}\n"
-                
-                # Add AOR section to config
-                self.config += f"\n{aor_section}"
+                        new_sections.append(f"{key}={value}")
             
-            # Add endpoint section to config
-            self.config += f"\n{endpoint_section}"
+            # Append new sections to file
+            with open(self.config_path, 'a') as f:
+                f.write('\n' + '\n'.join(new_sections) + '\n')
             
-            # Save changes
-            return self.save(backup_suffix="add_endpoint_efficient")
+            logger.info(f"Added endpoint {endpoint_id} efficiently")
+            return True
             
         except Exception as e:
             logger.error(f"Failed to add endpoint efficiently: {e}")
