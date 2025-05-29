@@ -416,9 +416,18 @@ class AdvancedPJSIPConfigParser:
             
             if 'auth' in endpoint_data:
                 auth_data = endpoint_data['auth']
-                for key, value in auth_data.items():
-                    if key not in ['id', 'type'] and value is not None:
-                        new_sections.append(f"{key}={value}")
+                # Ensure required auth fields are present
+                if 'username' not in auth_data:
+                    auth_data['username'] = endpoint_id
+                if 'password' not in auth_data:
+                    auth_data['password'] = ''
+                if 'realm' not in auth_data:
+                    auth_data['realm'] = 'UVLink'
+                
+                # Add auth fields
+                new_sections.append(f"username={auth_data['username']}")
+                new_sections.append(f"password={auth_data['password']}")
+                new_sections.append(f"realm={auth_data['realm']}")
             
             # Add AOR section
             new_sections.append(f"\n[{endpoint_id}]")
@@ -426,9 +435,12 @@ class AdvancedPJSIPConfigParser:
             
             if 'aor' in endpoint_data:
                 aor_data = endpoint_data['aor']
-                for key, value in aor_data.items():
-                    if key not in ['id', 'type'] and value is not None:
-                        new_sections.append(f"{key}={value}")
+                # Ensure required AOR fields are present
+                if 'max_contacts' not in aor_data:
+                    aor_data['max_contacts'] = 1
+                
+                # Add AOR fields
+                new_sections.append(f"max_contacts={aor_data['max_contacts']}")
             
             # Log final configuration
             logger.info("Final configuration:")

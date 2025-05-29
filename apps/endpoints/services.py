@@ -568,46 +568,53 @@ class AdvancedEndpointService:
             }
             
             # Handle custom data
-            complete_data['custom_data'] = {
+            custom_data = {
                 'name': endpoint_data.get('name', f'Extension {endpoint_id}')
             }
             
             # Add any other custom data
             if 'custom_data' in endpoint_data:
-                complete_data['custom_data'].update({
+                custom_data.update({
                     k: v for k, v in endpoint_data['custom_data'].items() 
                     if v is not None
                 })
             
-            # Handle auth section
+            # Only add custom_data if it has values
+            if custom_data:
+                complete_data['custom_data'] = custom_data
+            
+            # Handle auth section - ensure required fields
+            auth_data = {
+                'type': 'auth',
+                'auth_type': 'userpass',
+                'username': endpoint_id,  # Default to endpoint ID
+                'password': '',  # Default empty password
+                'realm': 'UVLink'  # Default realm
+            }
+            
+            # Update with provided auth data
             if 'auth' in endpoint_data:
-                complete_data['auth'] = {
-                    'type': 'auth',
-                    'auth_type': 'userpass',
-                    'username': endpoint_data['auth'].get('username', endpoint_id),
-                    'password': endpoint_data['auth'].get('password', ''),
-                    'realm': endpoint_data['auth'].get('realm', 'UVLink')
-                }
-            else:
-                complete_data['auth'] = {
-                    'type': 'auth',
-                    'auth_type': 'userpass',
-                    'username': endpoint_id,
-                    'password': '',
-                    'realm': 'UVLink'
-                }
+                if 'username' in endpoint_data['auth']:
+                    auth_data['username'] = endpoint_data['auth']['username']
+                if 'password' in endpoint_data['auth']:
+                    auth_data['password'] = endpoint_data['auth']['password']
+                if 'realm' in endpoint_data['auth']:
+                    auth_data['realm'] = endpoint_data['auth']['realm']
+            
+            complete_data['auth'] = auth_data
             
             # Handle AOR section
+            aor_data = {
+                'type': 'aor',
+                'max_contacts': 1  # Default value
+            }
+            
+            # Update with provided AOR data
             if 'aor' in endpoint_data:
-                complete_data['aor'] = {
-                    'type': 'aor',
-                    'max_contacts': endpoint_data['aor'].get('max_contacts', 1)
-                }
-            else:
-                complete_data['aor'] = {
-                    'type': 'aor',
-                    'max_contacts': 1
-                }
+                if 'max_contacts' in endpoint_data['aor']:
+                    aor_data['max_contacts'] = endpoint_data['aor']['max_contacts']
+            
+            complete_data['aor'] = aor_data
             
             logger.info(f"Complete endpoint data: {complete_data}")
             
