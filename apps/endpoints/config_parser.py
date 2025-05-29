@@ -391,36 +391,38 @@ class AdvancedPJSIPConfigParser:
             # Add endpoint section
             new_sections.append(f"[{endpoint_id}]")
             new_sections.append("type=endpoint")
+            new_sections.append("entity_type=endpoint")
+            
+            # Add auth and aor references right after type
+            new_sections.append(f"auth={endpoint_id}")
+            new_sections.append(f"aors={endpoint_id}")
             
             # Add basic fields
             for key, value in endpoint_data.items():
-                if key not in ['id', 'type', 'auth', 'aor'] and value is not None:
+                if key not in ['id', 'type', 'auth', 'aor', 'entity_type'] and value is not None:
                     new_sections.append(f"{key}={value}")
             
-            # Add auth section if provided
+            # Add auth section
+            new_sections.append(f"\n[{endpoint_id}]")
+            new_sections.append("type=auth")
+            new_sections.append("entity_type=endpoint")
+            new_sections.append("auth_type=userpass")
+            
             if 'auth' in endpoint_data:
                 auth_data = endpoint_data['auth']
-                auth_id = auth_data.get('id', endpoint_id)  # Use endpoint ID if not specified
-                new_sections.append(f"auth={auth_id}")
-                
-                # Create auth section
-                new_sections.append(f"\n[{auth_id}]")
-                new_sections.append("type=auth")
                 for key, value in auth_data.items():
-                    if key not in ['id', 'type'] and value is not None:
+                    if key not in ['id', 'type', 'entity_type'] and value is not None:
                         new_sections.append(f"{key}={value}")
             
-            # Add AOR section if provided
+            # Add AOR section
+            new_sections.append(f"\n[{endpoint_id}]")
+            new_sections.append("type=aor")
+            new_sections.append("entity_type=endpoint")
+            
             if 'aor' in endpoint_data:
                 aor_data = endpoint_data['aor']
-                aor_id = aor_data.get('id', endpoint_id)  # Use endpoint ID if not specified
-                new_sections.append(f"aors={aor_id}")
-                
-                # Create AOR section
-                new_sections.append(f"\n[{aor_id}]")
-                new_sections.append("type=aor")
                 for key, value in aor_data.items():
-                    if key not in ['id', 'type'] and value is not None:
+                    if key not in ['id', 'type', 'entity_type'] and value is not None:
                         new_sections.append(f"{key}={value}")
             
             # Append new sections to file
