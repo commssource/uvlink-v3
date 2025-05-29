@@ -422,7 +422,7 @@ class AdvancedPJSIPConfigParser:
                     new_sections.append(f"callerid=Extension {endpoint_id} <{endpoint_id}>")
             
             # Add auth section
-            new_sections.append(f"\n[{endpoint_id}]")
+            new_sections.append(f"\n[{endpoint_id}_auth]")
             new_sections.append("type=auth")
             new_sections.append("auth_type=userpass")
             
@@ -434,12 +434,14 @@ class AdvancedPJSIPConfigParser:
             # Always add username and password
             username = auth_data.get('username', endpoint_id)
             password = auth_data.get('password', '')
+            realm = auth_data.get('realm', 'UVLink')
             
             new_sections.append(f"username={username}")
             new_sections.append(f"password={password}")  # Always add password, even if empty
+            new_sections.append(f"realm={realm}")
             
             # Add AOR section with all required fields
-            new_sections.append(f"\n[{endpoint_id}]")
+            new_sections.append(f"\n[{endpoint_id}_aor]")
             new_sections.append("type=aor")
             new_sections.append("max_contacts=1")
             new_sections.append("qualify_frequency=60")
