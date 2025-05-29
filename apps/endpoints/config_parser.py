@@ -396,35 +396,18 @@ class AdvancedPJSIPConfigParser:
             new_sections.append(f"auth={endpoint_id}")
             new_sections.append(f"aors={endpoint_id}")
             
-            # Add basic fields and custom data
-            custom_data = {}
+            # Add basic fields
             for key, value in endpoint_data.items():
-                if key not in ['id', 'type', 'auth', 'aor'] and value is not None:
-                    # Check if it's a standard PJSIP option
-                    if key in [
-                        'context', 'allow', 'disallow', 'transport', 'auth', 'aors',
-                        'max_audio_streams', 'moh_suggest', 'tone_zone', 'dtmf_mode',
-                        'allow_transfer', 'identify_by', 'deny', 'permit', 'force_rport',
-                        'rewrite_contact', 'from_domain', 'direct_media', 'ice_support',
-                        'webrtc', 'rtp_symmetric', 'rtp_timeout', 'rtp_timeout_hold',
-                        'sdp_session', 'record_calls', 'one_touch_recording',
-                        'record_on_feature', 'record_off_feature', 'callerid',
-                        'callerid_privacy', 'connected_line_method', 'call_group',
-                        'pickup_group', 'device_state_busy_at', 'allow_subscribe',
-                        'send_pai', 'send_rpid', '100rel', 'mailboxes',
-                        'voicemail_extension', 'accountcode'
-                    ]:
-                        new_sections.append(f"{key}={value}")
-                    else:
-                        # Store non-standard options for set_var
-                        custom_data[key] = value
+                if key not in ['id', 'type', 'auth', 'aor', 'custom_data'] and value is not None:
+                    new_sections.append(f"{key}={value}")
             
             # Add custom data using set_var
-            if custom_data:
+            if 'custom_data' in endpoint_data and endpoint_data['custom_data']:
                 set_vars = []
-                for key, value in custom_data.items():
+                for key, value in endpoint_data['custom_data'].items():
                     set_vars.append(f"{key}={value}")
-                new_sections.append(f"set_var={','.join(set_vars)}")
+                if set_vars:
+                    new_sections.append(f"set_var={','.join(set_vars)}")
             
             # Add auth section
             new_sections.append(f"\n[{endpoint_id}]")
