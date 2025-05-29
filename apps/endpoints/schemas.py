@@ -135,7 +135,8 @@ class AdvancedEndpoint(BaseModel):
 
     @field_validator('audio_media.allow')
     @classmethod
-    def validate_codecs(cls, v):
+    def validate_codecs(cls, v: str) -> str:
+        """Validate codec list"""
         if not v or v == "all":
             return v
         allowed_codecs = ['ulaw', 'alaw', 'g722', 'g729', 'gsm', 'opus', 'h264', 'vp8', 'vp9']
@@ -147,7 +148,8 @@ class AdvancedEndpoint(BaseModel):
 
     @field_validator('call.callerid')
     @classmethod
-    def validate_callerid(cls, v):
+    def validate_callerid(cls, v: Optional[str]) -> Optional[str]:
+        """Validate caller ID format"""
         if v and not re.match(r'^[\w\s<>@.-]+$', v):
             raise ValueError('Invalid caller ID format')
         return v
