@@ -158,7 +158,7 @@ class SimpleEndpoint(BaseModel):
     """Simple endpoint configuration with basic settings"""
     id: str
     username: Optional[str] = None  # Optional since it can be in auth
-    password: Optional[str] = None  # Optional since it can be in auth
+    password: str  # Required password
     context: str = "internal"
     codecs: List[str] = ["ulaw", "alaw"]
     max_contacts: int = 1
@@ -179,11 +179,10 @@ class SimpleEndpoint(BaseModel):
 
     @field_validator('password')
     @classmethod
-    def validate_password(cls, v: Optional[str], info) -> Optional[str]:
-        """Validate password is provided either directly or in auth"""
-        values = info.data
-        if not v and not values.get('auth', {}).get('password'):
-            raise ValueError('password must be provided either directly or in auth object')
+    def validate_password(cls, v: str, info) -> str:
+        """Validate password is provided"""
+        if not v:
+            raise ValueError('password must be provided')
         return v
 
 class EndpointCreate(BaseModel):

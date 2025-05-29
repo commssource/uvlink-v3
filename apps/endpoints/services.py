@@ -190,42 +190,41 @@ class AdvancedEndpointService:
         try:
             # Convert simple endpoint to advanced format
             advanced_data = {
-                'id': endpoint_data.id,
-                'context': endpoint_data.context,
-                'allow': ','.join(endpoint_data.codecs),
-                'callerid': endpoint_data.callerid or "",
-                'auth': {
-                    'type': 'auth',
-                    'auth_type': 'userpass',
-                    'username': endpoint_data.username or endpoint_data.id,  # Use ID as fallback
-                    'password': endpoint_data.password or '',  # Use empty string as fallback
-                    'realm': 'UVLink'
+                "id": endpoint_data.id,
+                "type": "endpoint",
+                "context": "internal",
+                "allow": "ulaw,alaw",
+                "callerid": "",
+                "auth": {
+                    "type": "auth",
+                    "auth_type": "userpass",
+                    "username": endpoint_data.id,
+                    "password": endpoint_data.password,  # Use the password from the request
+                    "realm": "UVLink"
                 },
-                'aor': {
-                    'type': 'aor',
-                    'max_contacts': endpoint_data.max_contacts
+                "aor": {
+                    "type": "aor",
+                    "max_contacts": 1
+                },
+                "custom_data": {
+                    "name": f"Extension {endpoint_data.id}"
                 }
             }
             
-            # Add name as custom data
-            if endpoint_data.name:
-                advanced_data['custom_data'] = {
-                    'name': endpoint_data.name
-                }
-            else:
-                advanced_data['custom_data'] = {
-                    'name': f"Extension {endpoint_data.id}"
-                }
-            
             logger.info(f"Converting simple endpoint to advanced format: {advanced_data}")
             
-            # Use the efficient method to add the endpoint
-            parser = AdvancedPJSIPConfigParser(ASTERISK_PJSIP_CONFIG)
-            return parser.add_endpoint_efficient(advanced_data)
+            # Add endpoint using parser
+            parser = AdvancedPJSIPConfigParser("/etc/asterisk/pjsip.conf")
+            success = parser.add_endpoint_efficient(advanced_data)
+            
+            if not success:
+                raise HTTPException(status_code=400, detail="Failed to add endpoint")
+            
+            return {"message": "Endpoint added successfully", "endpoint": advanced_data}
             
         except Exception as e:
-            logger.error(f"Failed to add simple endpoint: {e}")
-            return False
+            logger.error(f"Error adding simple endpoint: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
     
     @staticmethod
     def add_bulk_endpoints(bulk_data: BulkEndpointCreate) -> Dict[str, Any]:
