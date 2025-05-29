@@ -271,9 +271,13 @@ class AdvancedPJSIPConfigParser:
             if section_type == 'endpoint':
                 endpoint_sections[section_name] = section_data
             elif section_type == 'auth':
-                auth_sections[section_name] = section_data
+                # Store auth section with the base endpoint ID
+                base_id = section_name.replace('_auth', '')
+                auth_sections[base_id] = section_data
             elif section_type == 'aor':
-                aor_sections[section_name] = section_data
+                # Store aor section with the base endpoint ID
+                base_id = section_name.replace('_aor', '')
+                aor_sections[base_id] = section_data
         
         # Second pass: build complete endpoint info
         for section_name, section_data in endpoint_sections.items():
@@ -294,14 +298,14 @@ class AdvancedPJSIPConfigParser:
                 'callerid': section_data.get('callerid', ''),
                 'webrtc': section_data.get('webrtc', 'no'),
                 'auth': {
-                    'type': auth_data.get('type', 'auth'),
-                    'auth_type': auth_data.get('auth_type', 'userpass'),
+                    'type': 'auth',
+                    'auth_type': 'userpass',
                     'username': auth_data.get('username', section_name),
                     'password': auth_data.get('password', ''),
                     'realm': auth_data.get('realm', 'UVLink')
                 },
                 'aor': {
-                    'type': aor_data.get('type', 'aor'),
+                    'type': 'aor',
                     'max_contacts': int(aor_data.get('max_contacts', 2)),
                     'qualify_frequency': int(aor_data.get('qualify_frequency', 60)) if aor_data.get('qualify_frequency') else 60,
                     'remove_unavailable': aor_data.get('remove_unavailable', 'no')
