@@ -128,6 +128,7 @@ class AdvancedEndpointService:
             
             # Prepare endpoint data
             endpoint_id = endpoint_data['id']
+            logger.info(f"Processing endpoint {endpoint_id} with data: {endpoint_data}")
             
             # Create flat data structure
             flat_data = {
@@ -140,8 +141,9 @@ class AdvancedEndpointService:
             }
             
             # Add custom data if present
-            if 'custom_data' in endpoint_data:
+            if 'custom_data' in endpoint_data and endpoint_data['custom_data']:
                 flat_data['custom_data'] = endpoint_data['custom_data']
+                logger.info(f"Added custom data: {endpoint_data['custom_data']}")
             
             # Add auth section
             if 'auth' in endpoint_data:
@@ -154,6 +156,7 @@ class AdvancedEndpointService:
                 if 'realm' not in auth_data:
                     auth_data['realm'] = 'UVLink'
                 flat_data['auth'] = auth_data
+                logger.info(f"Added auth data: {auth_data}")
             
             # Add AOR section
             if 'aor' in endpoint_data:
@@ -162,11 +165,14 @@ class AdvancedEndpointService:
                 if 'max_contacts' not in aor_data:
                     aor_data['max_contacts'] = 1
                 flat_data['aor'] = aor_data
+                logger.info(f"Added AOR data: {aor_data}")
             
             # Add any additional fields
             for key, value in endpoint_data.items():
                 if key not in ['id', 'type', 'auth', 'aor', 'custom_data'] and value is not None:
                     flat_data[key] = value
+            
+            logger.info(f"Final flat data: {flat_data}")
             
             # Add endpoint using efficient method
             return parser.add_endpoint_efficient(flat_data)

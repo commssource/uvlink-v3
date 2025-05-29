@@ -373,6 +373,7 @@ class AdvancedPJSIPConfigParser:
         """Add endpoint efficiently without full parsing"""
         try:
             endpoint_id = endpoint_data['id']
+            logger.info(f"Adding endpoint {endpoint_id} with data: {endpoint_data}")
             
             # First check if endpoint exists by scanning file
             with open(self.config_path, 'r') as f:
@@ -409,6 +410,7 @@ class AdvancedPJSIPConfigParser:
                         set_vars.append(f"{key}={value}")
                 if set_vars:
                     new_sections.append(f"set_var={','.join(set_vars)}")
+                    logger.info(f"Added set_var: {','.join(set_vars)}")
             
             # Add auth section
             new_sections.append(f"\n[{endpoint_id}]")
@@ -417,9 +419,11 @@ class AdvancedPJSIPConfigParser:
             
             if 'auth' in endpoint_data:
                 auth_data = endpoint_data['auth']
+                logger.info(f"Processing auth data: {auth_data}")
                 for key, value in auth_data.items():
                     if key not in ['id', 'type'] and value is not None:
                         new_sections.append(f"{key}={value}")
+                        logger.info(f"Added auth field: {key}={value}")
             
             # Add AOR section
             new_sections.append(f"\n[{endpoint_id}]")
@@ -427,9 +431,16 @@ class AdvancedPJSIPConfigParser:
             
             if 'aor' in endpoint_data:
                 aor_data = endpoint_data['aor']
+                logger.info(f"Processing AOR data: {aor_data}")
                 for key, value in aor_data.items():
                     if key not in ['id', 'type'] and value is not None:
                         new_sections.append(f"{key}={value}")
+                        logger.info(f"Added AOR field: {key}={value}")
+            
+            # Log final configuration
+            logger.info("Final configuration:")
+            for line in new_sections:
+                logger.info(line)
             
             # Append new sections to file
             with open(self.config_path, 'a') as f:
