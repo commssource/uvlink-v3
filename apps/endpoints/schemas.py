@@ -155,23 +155,31 @@ class AdvancedEndpoint(BaseModel):
         return flat_dict
 
 class SimpleEndpoint(BaseModel):
-    """Simplified endpoint for basic operations"""
-    id: str = Field(..., min_length=1, max_length=50, pattern=r'^[a-zA-Z0-9_-]+$')
-    username: str = Field(..., min_length=1, max_length=50)
-    password: str = Field(..., min_length=8, max_length=128)
-    context: str = Field(default="internal")
-    codecs: List[str] = Field(default=["ulaw", "alaw"])
-    max_contacts: int = Field(default=1, ge=1, le=10)
-    callerid: Optional[str] = Field(None, max_length=100)
-    name: Optional[str] = Field(None, max_length=100)
+    """Simple endpoint configuration with basic settings"""
+    id: str
+    username: Optional[str] = None  # Optional since it can be in auth
+    password: Optional[str] = None  # Optional since it can be in auth
+    context: str = "internal"
+    codecs: List[str] = ["ulaw", "alaw"]
+    max_contacts: int = 1
+    callerid: Optional[str] = None
+    name: Optional[str] = None
+    custom_data: Optional[Dict[str, Any]] = None
+    auth: Optional[AuthConfig] = None
+    aor: Optional[AORConfig] = None
 
-    @field_validator('codecs')
-    @classmethod
-    def validate_codecs(cls, v):
-        allowed_codecs = ['ulaw', 'alaw', 'g722', 'g729', 'gsm', 'opus']
-        for codec in v:
-            if codec not in allowed_codecs:
-                raise ValueError(f'Invalid codec: {codec}')
+    @validator('username')
+    def validate_username(cls, v, values):
+        """Validate username is provided either directly or in auth"""
+        if not v and not values.get('auth', {}).get('username'):
+            raise ValueError('username must be provided either directly or in auth object')
+        return v
+
+    @validator('password')
+    def validate_password(cls, v, values):
+        """Validate password is provided either directly or in auth"""
+        if not v and not values.get('auth', {}).get('password'):
+            raise ValueError('password must be provided either directly or in auth object')
         return v
 
 class EndpointCreate(BaseModel):
