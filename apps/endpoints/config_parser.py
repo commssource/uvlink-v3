@@ -392,8 +392,6 @@ class AdvancedPJSIPConfigParser:
             # Add endpoint section
             new_sections.append(f"[{endpoint_id}]")
             new_sections.append("type=endpoint")
-            
-            # Add auth and aor references right after type
             new_sections.append(f"auth={endpoint_id}")
             new_sections.append(f"aors={endpoint_id}")
             
@@ -410,7 +408,6 @@ class AdvancedPJSIPConfigParser:
                         set_vars.append(f"{key}={value}")
                 if set_vars:
                     new_sections.append(f"set_var={','.join(set_vars)}")
-                    logger.info(f"Added set_var: {','.join(set_vars)}")
             
             # Add auth section
             new_sections.append(f"\n[{endpoint_id}]")
@@ -419,19 +416,9 @@ class AdvancedPJSIPConfigParser:
             
             if 'auth' in endpoint_data:
                 auth_data = endpoint_data['auth']
-                logger.info(f"Processing auth data: {auth_data}")
-                # Ensure required auth fields are present
-                if 'username' not in auth_data:
-                    auth_data['username'] = endpoint_id
-                if 'password' not in auth_data:
-                    raise ValueError("Password is required in auth section")
-                if 'realm' not in auth_data:
-                    auth_data['realm'] = 'UVLink'
-                
                 for key, value in auth_data.items():
                     if key not in ['id', 'type'] and value is not None:
                         new_sections.append(f"{key}={value}")
-                        logger.info(f"Added auth field: {key}={value}")
             
             # Add AOR section
             new_sections.append(f"\n[{endpoint_id}]")
@@ -439,15 +426,9 @@ class AdvancedPJSIPConfigParser:
             
             if 'aor' in endpoint_data:
                 aor_data = endpoint_data['aor']
-                logger.info(f"Processing AOR data: {aor_data}")
-                # Ensure required AOR fields are present
-                if 'max_contacts' not in aor_data:
-                    aor_data['max_contacts'] = 1
-                
                 for key, value in aor_data.items():
                     if key not in ['id', 'type'] and value is not None:
                         new_sections.append(f"{key}={value}")
-                        logger.info(f"Added AOR field: {key}={value}")
             
             # Log final configuration
             logger.info("Final configuration:")

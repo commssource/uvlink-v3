@@ -553,5 +553,68 @@ class AdvancedEndpointService:
 
     @staticmethod
     def add_endpoint(endpoint_data: Dict[str, Any]) -> bool:
-        parser = AdvancedPJSIPConfigParser(ASTERISK_PJSIP_CONFIG)
-        return parser.add_endpoint_efficient(endpoint_data)
+        """Add an endpoint with proper data handling"""
+        try:
+            endpoint_id = endpoint_data['id']
+            logger.info(f"Adding endpoint {endpoint_id} with data: {endpoint_data}")
+            
+            # Create the complete endpoint data structure
+            complete_data = {
+                'id': endpoint_id,
+                'type': 'endpoint',
+                'context': endpoint_data.get('context', 'internal'),
+                'allow': endpoint_data.get('allow', 'ulaw,alaw'),
+                'callerid': endpoint_data.get('callerid', ''),
+            }
+            
+            # Handle custom data
+            complete_data['custom_data'] = {
+                'name': endpoint_data.get('name', f'Extension {endpoint_id}')
+            }
+            
+            # Add any other custom data
+            if 'custom_data' in endpoint_data:
+                complete_data['custom_data'].update({
+                    k: v for k, v in endpoint_data['custom_data'].items() 
+                    if v is not None
+                })
+            
+            # Handle auth section
+            if 'auth' in endpoint_data:
+                complete_data['auth'] = {
+                    'type': 'auth',
+                    'auth_type': 'userpass',
+                    'username': endpoint_data['auth'].get('username', endpoint_id),
+                    'password': endpoint_data['auth'].get('password', ''),
+                    'realm': endpoint_data['auth'].get('realm', 'UVLink')
+                }
+            else:
+                complete_data['auth'] = {
+                    'type': 'auth',
+                    'auth_type': 'userpass',
+                    'username': endpoint_id,
+                    'password': '',
+                    'realm': 'UVLink'
+                }
+            
+            # Handle AOR section
+            if 'aor' in endpoint_data:
+                complete_data['aor'] = {
+                    'type': 'aor',
+                    'max_contacts': endpoint_data['aor'].get('max_contacts', 1)
+                }
+            else:
+                complete_data['aor'] = {
+                    'type': 'aor',
+                    'max_contacts': 1
+                }
+            
+            logger.info(f"Complete endpoint data: {complete_data}")
+            
+            # Use the efficient method to add the endpoint
+            parser = AdvancedPJSIPConfigParser(ASTERISK_PJSIP_CONFIG)
+            return parser.add_endpoint_efficient(complete_data)
+            
+        except Exception as e:
+            logger.error(f"Failed to add endpoint: {e}")
+            return False
