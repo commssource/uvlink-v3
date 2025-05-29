@@ -390,6 +390,18 @@ class AdvancedPJSIPConfigParser:
             new_sections = []
             processed_keys = set()  # Track processed keys to avoid duplicates
             
+            # Valid PJSIP endpoint options
+            valid_endpoint_options = {
+                'type', 'auth', 'aors', 'context', 'disallow', 'allow', 'direct_media',
+                'dtmf_mode', 'external_media_address', 'force_rport', 'ice_support',
+                'identify_by', 'mailboxes', 'moh_suggest', 'outbound_auth',
+                'rewrite_contact', 'rtp_symmetric', 'rtp_timeout', 'rtp_timeout_hold',
+                'send_pai', 'send_rpid', 'sdp_session', 'tone_zone', 'transport',
+                'trust_id_inbound', 'trust_id_outbound', 'webrtc', '100rel',
+                'callerid', 'callerid_privacy', 'connected_line_method',
+                'device_state_busy_at', 'pickup_group', 'call_group'
+            }
+            
             # Add endpoint section
             new_sections.append(f"[{endpoint_id}]")
             new_sections.append("type=endpoint")
@@ -406,11 +418,13 @@ class AdvancedPJSIPConfigParser:
                                 # Fix 100rel field name
                                 if nested_key == 'rel100':
                                     nested_key = '100rel'
-                                if nested_key not in processed_keys:
+                                # Only add valid PJSIP options
+                                if nested_key in valid_endpoint_options and nested_key not in processed_keys:
                                     new_sections.append(f"{nested_key}={nested_value}")
                                     processed_keys.add(nested_key)
                     elif value is not None and value != 'None':
-                        if key not in processed_keys:
+                        # Only add valid PJSIP options
+                        if key in valid_endpoint_options and key not in processed_keys:
                             new_sections.append(f"{key}={value}")
                             processed_keys.add(key)
             
