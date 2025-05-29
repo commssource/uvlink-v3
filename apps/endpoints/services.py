@@ -187,28 +187,45 @@ class AdvancedEndpointService:
     @staticmethod
     def add_simple_endpoint(endpoint_data: SimpleEndpoint) -> bool:
         """Add a simple endpoint"""
-        # Convert simple endpoint to advanced format
-        advanced_data = {
-            'id': endpoint_data.id,
-            'name': endpoint_data.name or f"Extension {endpoint_data.id}",
-            'context': endpoint_data.context,
-            'allow': ','.join(endpoint_data.codecs),
-            'callerid': endpoint_data.callerid or "",
-            'auth': {
-                'id': endpoint_data.id,  # Use same ID as endpoint
-                'username': endpoint_data.username,
-                'password': endpoint_data.password,
-                'realm': 'UVLink'
-            },
-            'aor': {
-                'id': endpoint_data.id,  # Use same ID as endpoint
-                'max_contacts': endpoint_data.max_contacts
+        try:
+            # Convert simple endpoint to advanced format
+            advanced_data = {
+                'id': endpoint_data.id,
+                'context': endpoint_data.context,
+                'allow': ','.join(endpoint_data.codecs),
+                'callerid': endpoint_data.callerid or "",
+                'auth': {
+                    'type': 'auth',
+                    'auth_type': 'userpass',
+                    'username': endpoint_data.username or endpoint_data.id,  # Use ID as fallback
+                    'password': endpoint_data.password or '',  # Use empty string as fallback
+                    'realm': 'UVLink'
+                },
+                'aor': {
+                    'type': 'aor',
+                    'max_contacts': endpoint_data.max_contacts
+                }
             }
-        }
-        
-        # Use efficient method for new endpoints
-        parser = AdvancedPJSIPConfigParser(ASTERISK_PJSIP_CONFIG)
-        return parser.add_endpoint_efficient(advanced_data)
+            
+            # Add name as custom data
+            if endpoint_data.name:
+                advanced_data['custom_data'] = {
+                    'name': endpoint_data.name
+                }
+            else:
+                advanced_data['custom_data'] = {
+                    'name': f"Extension {endpoint_data.id}"
+                }
+            
+            logger.info(f"Converting simple endpoint to advanced format: {advanced_data}")
+            
+            # Use the efficient method to add the endpoint
+            parser = AdvancedPJSIPConfigParser(ASTERISK_PJSIP_CONFIG)
+            return parser.add_endpoint_efficient(advanced_data)
+            
+        except Exception as e:
+            logger.error(f"Failed to add simple endpoint: {e}")
+            return False
     
     @staticmethod
     def add_bulk_endpoints(bulk_data: BulkEndpointCreate) -> Dict[str, Any]:
