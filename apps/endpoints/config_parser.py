@@ -415,22 +415,26 @@ class AdvancedPJSIPConfigParser:
                 if name:
                     new_sections.append(f"callerid={name} <{endpoint_id}>")
                 else:
-                    new_sections.append(f"callerid=<{endpoint_id}>")
+                    new_sections.append(f"callerid=Extension {endpoint_id} <{endpoint_id}>")
             
             # Add auth section
             new_sections.append(f"\n[{endpoint_id}]")
             new_sections.append("type=auth")
             new_sections.append("auth_type=userpass")
             
-            if 'auth' in endpoint_data:
-                auth_data = endpoint_data['auth']
-                username = auth_data.get('username', endpoint_id)
-                password = auth_data.get('password', '')
-                
-                if username is not None and username != 'None':
-                    new_sections.append(f"username={username}")
-                if password is not None and password != 'None':
-                    new_sections.append(f"password={password}")
+            # Get auth data from either auth section or endpoint_settings
+            auth_data = endpoint_data.get('auth', {})
+            if not auth_data and 'endpoint_settings' in endpoint_data:
+                auth_data = endpoint_data['endpoint_settings']
+            
+            # Ensure required auth fields are present
+            username = auth_data.get('username', endpoint_id)
+            password = auth_data.get('password', '')
+            
+            # Always add username and password
+            new_sections.append(f"username={username}")
+            if password:
+                new_sections.append(f"password={password}")
             
             # Add AOR section
             new_sections.append(f"\n[{endpoint_id}]")
