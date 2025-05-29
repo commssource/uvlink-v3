@@ -395,10 +395,16 @@ class AdvancedPJSIPConfigParser:
             new_sections.append(f"auth={endpoint_id}")
             new_sections.append(f"aors={endpoint_id}")
             
-            # Add basic fields
+            # Add basic fields and flatten nested objects
             for key, value in endpoint_data.items():
-                if key not in ['id', 'type', 'auth', 'aor', 'custom_data'] and value is not None:
-                    new_sections.append(f"{key}={value}")
+                if key not in ['id', 'type', 'auth', 'aor', 'custom_data']:
+                    if isinstance(value, dict):
+                        # Flatten nested objects
+                        for nested_key, nested_value in value.items():
+                            if nested_value is not None and nested_value != 'None':
+                                new_sections.append(f"{nested_key}={nested_value}")
+                    elif value is not None and value != 'None':
+                        new_sections.append(f"{key}={value}")
             
             # Add custom data using set_var
             if 'custom_data' in endpoint_data and endpoint_data['custom_data']:
@@ -435,10 +441,10 @@ class AdvancedPJSIPConfigParser:
             
             if 'aor' in endpoint_data:
                 aor_data = endpoint_data['aor']
-                # Ensure required AOR fields are present
-                max_contacts = aor_data.get('max_contacts', 1)
-                if max_contacts is not None and max_contacts != 'None':
-                    new_sections.append(f"max_contacts={max_contacts}")
+                # Add all non-None AOR fields
+                for key, value in aor_data.items():
+                    if key not in ['id', 'type', 'entity_type'] and value is not None and value != 'None':
+                        new_sections.append(f"{key}={value}")
             
             # Log final configuration
             logger.info("Final configuration:")
