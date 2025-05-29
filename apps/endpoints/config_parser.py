@@ -388,6 +388,7 @@ class AdvancedPJSIPConfigParser:
             
             # Prepare new sections
             new_sections = []
+            processed_keys = set()  # Track processed keys to avoid duplicates
             
             # Add endpoint section
             new_sections.append(f"[{endpoint_id}]")
@@ -397,14 +398,21 @@ class AdvancedPJSIPConfigParser:
             
             # Add basic fields and flatten nested objects
             for key, value in endpoint_data.items():
-                if key not in ['id', 'type', 'auth', 'aor', 'custom_data']:
+                if key not in ['id', 'type', 'auth', 'aor', 'custom_data', 'entity_type']:
                     if isinstance(value, dict):
                         # Flatten nested objects
                         for nested_key, nested_value in value.items():
                             if nested_value is not None and nested_value != 'None':
-                                new_sections.append(f"{nested_key}={nested_value}")
+                                # Fix 100rel field name
+                                if nested_key == 'rel100':
+                                    nested_key = '100rel'
+                                if nested_key not in processed_keys:
+                                    new_sections.append(f"{nested_key}={nested_value}")
+                                    processed_keys.add(nested_key)
                     elif value is not None and value != 'None':
-                        new_sections.append(f"{key}={value}")
+                        if key not in processed_keys:
+                            new_sections.append(f"{key}={value}")
+                            processed_keys.add(key)
             
             # Add custom data using set_var
             if 'custom_data' in endpoint_data and endpoint_data['custom_data']:
