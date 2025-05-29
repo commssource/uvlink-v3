@@ -405,7 +405,8 @@ class AdvancedPJSIPConfigParser:
             if 'custom_data' in endpoint_data and endpoint_data['custom_data']:
                 set_vars = []
                 for key, value in endpoint_data['custom_data'].items():
-                    set_vars.append(f"{key}={value}")
+                    if value is not None:
+                        set_vars.append(f"{key}={value}")
                 if set_vars:
                     new_sections.append(f"set_var={','.join(set_vars)}")
             

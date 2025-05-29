@@ -120,48 +120,49 @@ class AdvancedEndpointService:
         return None
     
     @staticmethod
-    def add_endpoint_from_json(endpoint_json: Dict[str, Any]) -> bool:
-        """Add endpoint from your JSON format"""
-        # Convert organized JSON to flat format for PJSIP config
-        flat_data = {}
-        
-        # Basic fields
-        endpoint_id = endpoint_json['id']
-        flat_data['id'] = endpoint_id
-        flat_data['type'] = endpoint_json.get('type', 'endpoint')
-        flat_data['name'] = endpoint_json.get('name')
-        flat_data['accountcode'] = endpoint_json.get('accountcode')
-        
-        # Flatten sections
-        sections = [
-            ('audio_media', endpoint_json.get('audio_media', {})),
-            ('transport_network', endpoint_json.get('transport_network', {})),
-            ('rtp', endpoint_json.get('rtp', {})),
-            ('recording', endpoint_json.get('recording', {})),
-            ('call', endpoint_json.get('call', {})),
-            ('presence', endpoint_json.get('presence', {})),
-            ('voicemail', endpoint_json.get('voicemail', {}))
-        ]
-        
-        for section_name, section_data in sections:
-            for key, value in section_data.items():
-                if value is not None:
+    def add_endpoint_from_json(endpoint_data: Dict[str, Any]) -> bool:
+        """Add endpoint from JSON data"""
+        try:
+            # Get parser instance
+            parser = AdvancedEndpointService.get_parser()
+            
+            # Prepare endpoint data
+            endpoint_id = endpoint_data['id']
+            
+            # Create flat data structure
+            flat_data = {
+                'id': endpoint_id,
+                'type': 'endpoint',
+                'name': endpoint_data.get('name', f'Extension {endpoint_id}'),
+                'context': endpoint_data.get('context', 'internal'),
+                'allow': endpoint_data.get('allow', 'ulaw,alaw'),
+                'callerid': endpoint_data.get('callerid', ''),
+                'custom_data': endpoint_data.get('custom_data', {})
+            }
+            
+            # Add auth section
+            if 'auth' in endpoint_data:
+                auth_data = endpoint_data['auth'].copy()
+                auth_data['id'] = endpoint_id  # Use same ID as endpoint
+                flat_data['auth'] = auth_data
+            
+            # Add AOR section
+            if 'aor' in endpoint_data:
+                aor_data = endpoint_data['aor'].copy()
+                aor_data['id'] = endpoint_id  # Use same ID as endpoint
+                flat_data['aor'] = aor_data
+            
+            # Add any additional fields
+            for key, value in endpoint_data.items():
+                if key not in ['id', 'type', 'auth', 'aor', 'custom_data'] and value is not None:
                     flat_data[key] = value
-        
-        # Auth and AOR - use same ID as endpoint
-        if 'auth' in endpoint_json:
-            auth_data = endpoint_json['auth'].copy()
-            auth_data['id'] = endpoint_id  # Use same ID as endpoint
-            flat_data['auth'] = auth_data
-        
-        if 'aor' in endpoint_json:
-            aor_data = endpoint_json['aor'].copy()
-            aor_data['id'] = endpoint_id  # Use same ID as endpoint
-            flat_data['aor'] = aor_data
-        
-        # Use efficient method for new endpoints
-        parser = AdvancedPJSIPConfigParser(ASTERISK_PJSIP_CONFIG)
-        return parser.add_endpoint_efficient(flat_data)
+            
+            # Add endpoint using efficient method
+            return parser.add_endpoint_efficient(flat_data)
+            
+        except Exception as e:
+            logger.error(f"Failed to add endpoint from JSON: {e}")
+            return False
     
     @staticmethod
     def add_simple_endpoint(endpoint_data: SimpleEndpoint) -> bool:
