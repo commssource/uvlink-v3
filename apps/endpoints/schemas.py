@@ -13,6 +13,19 @@ class AudioMediaSettings(BaseModel):
     dtmf_mode: str = Field(default="rfc4733")
     allow_transfer: str = Field(default="yes", pattern=r'^(yes|no)$')
 
+    @field_validator('allow')
+    @classmethod
+    def validate_codecs(cls, v: str) -> str:
+        """Validate codec list"""
+        if not v or v == "all":
+            return v
+        allowed_codecs = ['ulaw', 'alaw', 'g722', 'g729', 'gsm', 'opus', 'h264', 'vp8', 'vp9']
+        codecs = [codec.strip() for codec in v.split(',')]
+        for codec in codecs:
+            if codec not in allowed_codecs and codec != "all":
+                raise ValueError(f'Invalid codec: {codec}')
+        return v
+
 class TransportNetworkSettings(BaseModel):
     """Transport and network configuration settings"""
     transport: str = Field(default="transport-udp")
@@ -50,6 +63,14 @@ class CallSettings(BaseModel):
     call_group: Optional[str] = Field(default="1")
     pickup_group: Optional[str] = Field(default="1")
     device_state_busy_at: int = Field(default=2, ge=1, le=10)
+
+    @field_validator('callerid')
+    @classmethod
+    def validate_callerid(cls, v: Optional[str]) -> Optional[str]:
+        """Validate caller ID format"""
+        if v and not re.match(r'^[\w\s<>@.-]+$', v):
+            raise ValueError('Invalid caller ID format')
+        return v
 
 class PresenceSettings(BaseModel):
     """Presence and subscription settings"""
@@ -132,27 +153,6 @@ class AdvancedEndpoint(BaseModel):
             flat_dict.update(section.model_dump())
         
         return flat_dict
-
-    @field_validator('audio_media.allow')
-    @classmethod
-    def validate_codecs(cls, v: str) -> str:
-        """Validate codec list"""
-        if not v or v == "all":
-            return v
-        allowed_codecs = ['ulaw', 'alaw', 'g722', 'g729', 'gsm', 'opus', 'h264', 'vp8', 'vp9']
-        codecs = [codec.strip() for codec in v.split(',')]
-        for codec in codecs:
-            if codec not in allowed_codecs and codec != "all":
-                raise ValueError(f'Invalid codec: {codec}')
-        return v
-
-    @field_validator('call.callerid')
-    @classmethod
-    def validate_callerid(cls, v: Optional[str]) -> Optional[str]:
-        """Validate caller ID format"""
-        if v and not re.match(r'^[\w\s<>@.-]+$', v):
-            raise ValueError('Invalid caller ID format')
-        return v
 
 class SimpleEndpoint(BaseModel):
     """Simplified endpoint for basic operations"""
