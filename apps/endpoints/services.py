@@ -142,8 +142,11 @@ class AdvancedEndpointService:
             
             # Add custom data if present
             if 'custom_data' in endpoint_data and endpoint_data['custom_data']:
-                flat_data['custom_data'] = endpoint_data['custom_data']
-                logger.info(f"Added custom data: {endpoint_data['custom_data']}")
+                flat_data['custom_data'] = {
+                    k: v for k, v in endpoint_data['custom_data'].items() 
+                    if v is not None
+                }
+                logger.info(f"Added custom data: {flat_data['custom_data']}")
             
             # Add auth section
             if 'auth' in endpoint_data:
