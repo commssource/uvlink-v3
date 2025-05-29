@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+import re
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 
@@ -26,9 +27,85 @@ class AdvancedEndpointService:
     
     @staticmethod
     def list_endpoints() -> List[Dict[str, Any]]:
-        """List all endpoints from current configuration"""
+        """List all endpoints from current configuration with organized sections"""
         parser = AdvancedEndpointService.get_parser()
-        return parser.list_endpoints()
+        endpoints = parser.list_endpoints()
+        
+        # Organize endpoints into sections
+        organized_endpoints = []
+        for endpoint in endpoints:
+            organized = {
+                'id': endpoint['id'],
+                'type': endpoint['type'],
+                'name': endpoint.get('name', f"Extension {endpoint['id']}"),
+                'accountcode': endpoint.get('accountcode'),
+                
+                'audio_media': {
+                    'max_audio_streams': int(endpoint.get('max_audio_streams', 2)),
+                    'allow': endpoint.get('allow', 'ulaw,alaw'),
+                    'disallow': endpoint.get('disallow', 'all'),
+                    'moh_suggest': endpoint.get('moh_suggest', 'default'),
+                    'tone_zone': endpoint.get('tone_zone', 'us'),
+                    'dtmf_mode': endpoint.get('dtmf_mode', 'rfc4733'),
+                    'allow_transfer': endpoint.get('allow_transfer', 'yes')
+                },
+                
+                'transport_network': {
+                    'transport': endpoint.get('transport', 'transport-udp'),
+                    'identify_by': endpoint.get('identify_by', 'username'),
+                    'deny': endpoint.get('deny', ''),
+                    'permit': endpoint.get('permit', ''),
+                    'force_rport': endpoint.get('force_rport', 'yes'),
+                    'rewrite_contact': endpoint.get('rewrite_contact', 'yes'),
+                    'from_user': endpoint.get('from_user'),
+                    'from_domain': endpoint.get('from_domain', ''),
+                    'direct_media': endpoint.get('direct_media', 'no'),
+                    'ice_support': endpoint.get('ice_support', 'no'),
+                    'webrtc': endpoint.get('webrtc', 'no')
+                },
+                
+                'rtp': {
+                    'rtp_symmetric': endpoint.get('rtp_symmetric', 'yes'),
+                    'rtp_timeout': int(endpoint.get('rtp_timeout', 30)),
+                    'rtp_timeout_hold': int(endpoint.get('rtp_timeout_hold', 60)),
+                    'sdp_session': endpoint.get('sdp_session', 'Asterisk')
+                },
+                
+                'recording': {
+                    'record_calls': endpoint.get('record_calls', 'yes'),
+                    'one_touch_recording': endpoint.get('one_touch_recording', 'yes'),
+                    'record_on_feature': endpoint.get('record_on_feature', '*1'),
+                    'record_off_feature': endpoint.get('record_off_feature', '*2')
+                },
+                
+                'call': {
+                    'context': endpoint.get('context', 'internal'),
+                    'callerid': endpoint.get('callerid', ''),
+                    'callerid_privacy': endpoint.get('callerid_privacy', ''),
+                    'connected_line_method': endpoint.get('connected_line_method', 'invite'),
+                    'call_group': endpoint.get('call_group', '1'),
+                    'pickup_group': endpoint.get('pickup_group', '1'),
+                    'device_state_busy_at': int(endpoint.get('device_state_busy_at', 2))
+                },
+                
+                'presence': {
+                    'allow_subscribe': endpoint.get('allow_subscribe', 'yes'),
+                    'send_pai': endpoint.get('send_pai', 'yes'),
+                    'send_rpid': endpoint.get('send_rpid', 'yes'),
+                    '100rel': endpoint.get('100rel', 'no')
+                },
+                
+                'voicemail': {
+                    'mailboxes': endpoint.get('mailboxes', ''),
+                    'voicemail_extension': endpoint.get('voicemail_extension', '')
+                },
+                
+                'auth': endpoint.get('auth', {}),
+                'aor': endpoint.get('aor', {})
+            }
+            organized_endpoints.append(organized)
+        
+        return organized_endpoints
     
     @staticmethod
     def get_endpoint(endpoint_id: str) -> Optional[Dict[str, Any]]:
@@ -45,78 +122,42 @@ class AdvancedEndpointService:
     @staticmethod
     def add_endpoint_from_json(endpoint_json: Dict[str, Any]) -> bool:
         """Add endpoint from your JSON format"""
-        parser = AdvancedEndpointService.get_parser()
+        # Convert organized JSON to flat format for PJSIP config
+        flat_data = {}
         
-        try:
-            # Convert your JSON format to our internal format
-            endpoint_data = {
-                'id': endpoint_json['id'],
-                'type': endpoint_json.get('type', 'endpoint'),
-                'entity_type': endpoint_json.get('entity_type', 'endpoint'),
-                'name': endpoint_json.get('name', f"Extension {endpoint_json['id']}"),
-                'accountcode': endpoint_json.get('accountcode'),
-                'max_audio_streams': endpoint_json.get('max_audio_streams', '2'),
-                'device_state_busy_at': endpoint_json.get('device_state_busy_at', '2'),
-                'allow_transfer': endpoint_json.get('allow_transfer', 'yes'),
-                'outbound_auth': endpoint_json.get('outbound_auth', ''),
-                'context': endpoint_json.get('context', 'internal'),
-                'callerid': endpoint_json.get('callerid', ''),
-                'callerid_privacy': endpoint_json.get('callerid_privacy', ''),
-                'connected_line_method': endpoint_json.get('connected_line_method', 'invite'),
-                'transport': endpoint_json.get('transport', 'transport-udp'),
-                'identify_by': endpoint_json.get('identify_by', 'username'),
-                'deny': endpoint_json.get('deny', ''),
-                'permit': endpoint_json.get('permit', ''),
-                'allow': endpoint_json.get('allow', 'ulaw,alaw'),
-                'disallow': endpoint_json.get('disallow', 'all'),
-                'force_rport': endpoint_json.get('force_rport', 'yes'),
-                'webrtc': endpoint_json.get('webrtc', 'no'),
-                'moh_suggest': endpoint_json.get('moh_suggest', 'default'),
-                'call_group': endpoint_json.get('call_group', '1'),
-                'rtp_symmetric': endpoint_json.get('rtp_symmetric', 'yes'),
-                'rtp_timeout': endpoint_json.get('rtp_timeout', '30'),
-                'rtp_timeout_hold': endpoint_json.get('rtp_timeout_hold', '60'),
-                'rewrite_contact': endpoint_json.get('rewrite_contact', 'yes'),
-                'from_user': endpoint_json.get('from_user', endpoint_json['id']),
-                'from_domain': endpoint_json.get('from_domain', ''),
-                'mailboxes': endpoint_json.get('mailboxes', ''),
-                'voicemail_extension': endpoint_json.get('voicemail_extension', ''),
-                'pickup_group': endpoint_json.get('pickup_group', '1'),
-                'one_touch_recording': endpoint_json.get('one_touch_recording', 'yes'),
-                'record_on_feature': endpoint_json.get('record_on_feature', '*1'),
-                'record_off_feature': endpoint_json.get('record_off_feature', '*2'),
-                'record_calls': endpoint_json.get('record_calls', 'yes'),
-                'allow_subscribe': endpoint_json.get('allow_subscribe', 'yes'),
-                'dtmf_mode': endpoint_json.get('dtmf_mode', 'rfc4733'),
-                '100rel': endpoint_json.get('100rel', 'no'),
-                'direct_media': endpoint_json.get('direct_media', 'no'),
-                'ice_support': endpoint_json.get('ice_support', 'no'),
-                'sdp_session': endpoint_json.get('sdp_session', 'Asterisk'),
-                'set_var': endpoint_json.get('set_var', ''),
-                'tone_zone': endpoint_json.get('tone_zone', 'us'),
-                'send_pai': endpoint_json.get('send_pai', 'yes'),
-                'send_rpid': endpoint_json.get('send_rpid', 'yes'),
-                'mac_address': endpoint_json.get('mac_address'),
-                'auto_provisioning_enabled': endpoint_json.get('auto_provisioning_enabled', True),
-                'auth': endpoint_json.get('auth', {}),
-                'aor': endpoint_json.get('aor', {})
-            }
-            
-            # Add endpoint
-            if parser.add_advanced_endpoint(endpoint_data):
-                return parser.save(backup_suffix="add_advanced_endpoint")
-            
-            return False
-            
-        except Exception as e:
-            logger.error(f"Failed to add endpoint from JSON: {e}")
-            return False
+        # Basic fields
+        flat_data['id'] = endpoint_json['id']
+        flat_data['type'] = endpoint_json.get('type', 'endpoint')
+        flat_data['name'] = endpoint_json.get('name')
+        flat_data['accountcode'] = endpoint_json.get('accountcode')
+        
+        # Flatten sections
+        sections = [
+            ('audio_media', endpoint_json.get('audio_media', {})),
+            ('transport_network', endpoint_json.get('transport_network', {})),
+            ('rtp', endpoint_json.get('rtp', {})),
+            ('recording', endpoint_json.get('recording', {})),
+            ('call', endpoint_json.get('call', {})),
+            ('presence', endpoint_json.get('presence', {})),
+            ('voicemail', endpoint_json.get('voicemail', {}))
+        ]
+        
+        for section_name, section_data in sections:
+            for key, value in section_data.items():
+                if value is not None:
+                    flat_data[key] = value
+        
+        # Auth and AOR
+        flat_data['auth'] = endpoint_json.get('auth', {})
+        flat_data['aor'] = endpoint_json.get('aor', {})
+        
+        # Use efficient method for new endpoints
+        parser = AdvancedPJSIPConfigParser(ASTERISK_PJSIP_CONFIG)
+        return parser.add_endpoint_efficient(flat_data)
     
     @staticmethod
     def add_simple_endpoint(endpoint_data: SimpleEndpoint) -> bool:
         """Add a simple endpoint"""
-        parser = AdvancedEndpointService.get_parser()
-        
         # Convert simple endpoint to advanced format
         advanced_data = {
             'id': endpoint_data.id,
@@ -134,10 +175,9 @@ class AdvancedEndpointService:
             }
         }
         
-        if parser.add_advanced_endpoint(advanced_data):
-            return parser.save(backup_suffix="add_simple_endpoint")
-        
-        return False
+        # Use efficient method for new endpoints
+        parser = AdvancedPJSIPConfigParser(ASTERISK_PJSIP_CONFIG)
+        return parser.add_endpoint_efficient(advanced_data)
     
     @staticmethod
     def add_bulk_endpoints(bulk_data: BulkEndpointCreate) -> Dict[str, Any]:
@@ -202,8 +242,8 @@ class AdvancedEndpointService:
     
     @staticmethod
     def update_endpoint(endpoint_id: str, endpoint_data: EndpointUpdate) -> bool:
-        """Update an existing endpoint"""
-        parser = AdvancedEndpointService.get_parser()
+        """Update an existing endpoint - requires full parsing"""
+        parser = AdvancedEndpointService.get_parser()  # This will parse the entire file
         
         # Build update data
         update_data = {'id': endpoint_id}
@@ -249,8 +289,8 @@ class AdvancedEndpointService:
     
     @staticmethod
     def delete_endpoint(endpoint_id: str) -> bool:
-        """Delete an endpoint safely"""
-        parser = AdvancedEndpointService.get_parser()
+        """Delete an endpoint safely - requires full parsing"""
+        parser = AdvancedEndpointService.get_parser()  # This will parse the entire file
         
         if parser.delete_endpoint(endpoint_id):
             return parser.save(backup_suffix="delete_endpoint")
@@ -287,6 +327,83 @@ class AdvancedEndpointService:
             if field not in endpoint_json or not endpoint_json[field]:
                 errors.append(f"Missing required field: {field}")
         
+        # Validate ID format
+        if 'id' in endpoint_json:
+            if not re.match(r'^[a-zA-Z0-9_-]+$', endpoint_json['id']):
+                errors.append("ID must contain only letters, numbers, underscores, and hyphens")
+        
+        # Validate sections
+        sections = {
+            'audio_media': {
+                'max_audio_streams': (int, 1, 10),
+                'allow': (str, None, None),
+                'disallow': (str, None, None),
+                'moh_suggest': (str, None, None),
+                'tone_zone': (str, None, None),
+                'dtmf_mode': (str, None, None),
+                'allow_transfer': (str, ['yes', 'no'])
+            },
+            'transport_network': {
+                'transport': (str, None, None),
+                'identify_by': (str, None, None),
+                'force_rport': (str, ['yes', 'no']),
+                'rewrite_contact': (str, ['yes', 'no']),
+                'direct_media': (str, ['yes', 'no']),
+                'ice_support': (str, ['yes', 'no']),
+                'webrtc': (str, ['yes', 'no'])
+            },
+            'rtp': {
+                'rtp_symmetric': (str, ['yes', 'no']),
+                'rtp_timeout': (int, 0, 300),
+                'rtp_timeout_hold': (int, 0, 3600),
+                'sdp_session': (str, None, None)
+            },
+            'recording': {
+                'record_calls': (str, ['yes', 'no']),
+                'one_touch_recording': (str, ['yes', 'no']),
+                'record_on_feature': (str, None, None),
+                'record_off_feature': (str, None, None)
+            },
+            'call': {
+                'context': (str, None, None),
+                'callerid': (str, None, None),
+                'callerid_privacy': (str, None, None),
+                'connected_line_method': (str, None, None),
+                'call_group': (str, None, None),
+                'pickup_group': (str, None, None),
+                'device_state_busy_at': (int, 1, 10)
+            },
+            'presence': {
+                'allow_subscribe': (str, ['yes', 'no']),
+                'send_pai': (str, ['yes', 'no']),
+                'send_rpid': (str, ['yes', 'no']),
+                '100rel': (str, ['yes', 'no'])
+            }
+        }
+        
+        # Validate each section
+        for section_name, section_fields in sections.items():
+            if section_name in endpoint_json:
+                section_data = endpoint_json[section_name]
+                for field_name, (field_type, min_val, max_val) in section_fields.items():
+                    if field_name in section_data:
+                        value = section_data[field_name]
+                        
+                        # Type validation
+                        if not isinstance(value, field_type):
+                            errors.append(f"{section_name}.{field_name} must be of type {field_type.__name__}")
+                            continue
+                        
+                        # Range validation for numbers
+                        if field_type == int and min_val is not None and max_val is not None:
+                            if not min_val <= value <= max_val:
+                                errors.append(f"{section_name}.{field_name} must be between {min_val} and {max_val}")
+                        
+                        # Enum validation for strings
+                        if field_type == str and isinstance(min_val, list):
+                            if value not in min_val:
+                                errors.append(f"{section_name}.{field_name} must be one of {min_val}")
+        
         # Validate auth section
         if 'auth' in endpoint_json:
             auth = endpoint_json['auth']
@@ -294,13 +411,37 @@ class AdvancedEndpointService:
                 errors.append("Auth username is required")
             if not auth.get('password'):
                 errors.append("Auth password is required")
+            if auth.get('username') and len(auth['username']) > 50:
+                errors.append("Auth username must be 50 characters or less")
+            if auth.get('password') and len(auth['password']) > 128:
+                errors.append("Auth password must be 128 characters or less")
         else:
             errors.append("Auth configuration is required")
         
+        # Validate AOR section
+        if 'aor' in endpoint_json:
+            aor = endpoint_json['aor']
+            if 'max_contacts' in aor:
+                try:
+                    max_contacts = int(aor['max_contacts'])
+                    if not 1 <= max_contacts <= 10:
+                        errors.append("AOR max_contacts must be between 1 and 10")
+                except ValueError:
+                    errors.append("AOR max_contacts must be a number")
+            if 'qualify_frequency' in aor:
+                try:
+                    qualify_freq = int(aor['qualify_frequency'])
+                    if not 0 <= qualify_freq <= 300:
+                        errors.append("AOR qualify_frequency must be between 0 and 300")
+                except ValueError:
+                    errors.append("AOR qualify_frequency must be a number")
+        else:
+            errors.append("AOR configuration is required")
+        
         # Validate codecs
-        if 'allow' in endpoint_json:
+        if 'audio_media' in endpoint_json and 'allow' in endpoint_json['audio_media']:
             allowed_codecs = ['ulaw', 'alaw', 'g722', 'g729', 'gsm', 'opus', 'h264', 'vp8', 'vp9']
-            codecs = [c.strip() for c in endpoint_json['allow'].split(',')]
+            codecs = [c.strip() for c in endpoint_json['audio_media']['allow'].split(',')]
             for codec in codecs:
                 if codec not in allowed_codecs and codec != 'all':
                     warnings.append(f"Unknown codec: {codec}")
@@ -371,3 +512,8 @@ class AdvancedEndpointService:
                 })
         
         return results
+
+    @staticmethod
+    def add_endpoint(endpoint_data: Dict[str, Any]) -> bool:
+        parser = AdvancedPJSIPConfigParser(ASTERISK_PJSIP_CONFIG)
+        return parser.add_endpoint_efficient(endpoint_data)

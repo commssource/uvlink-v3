@@ -3,6 +3,66 @@ from typing import List, Optional, Dict, Any, Union
 from datetime import datetime
 import re
 
+class AudioMediaSettings(BaseModel):
+    """Audio and media configuration settings"""
+    max_audio_streams: int = Field(default=2, ge=1, le=10)
+    allow: str = Field(default="ulaw,alaw")
+    disallow: str = Field(default="all")
+    moh_suggest: str = Field(default="default")
+    tone_zone: str = Field(default="us")
+    dtmf_mode: str = Field(default="rfc4733")
+    allow_transfer: str = Field(default="yes", pattern=r'^(yes|no)$')
+
+class TransportNetworkSettings(BaseModel):
+    """Transport and network configuration settings"""
+    transport: str = Field(default="transport-udp")
+    identify_by: str = Field(default="username")
+    deny: Optional[str] = Field(default="")
+    permit: Optional[str] = Field(default="")
+    force_rport: str = Field(default="yes", pattern=r'^(yes|no)$')
+    rewrite_contact: str = Field(default="yes", pattern=r'^(yes|no)$')
+    from_user: Optional[str] = Field(None, max_length=50)
+    from_domain: Optional[str] = Field(default="")
+    direct_media: str = Field(default="no", pattern=r'^(yes|no)$')
+    ice_support: str = Field(default="no", pattern=r'^(yes|no)$')
+    webrtc: str = Field(default="no", pattern=r'^(yes|no)$')
+
+class RTPSettings(BaseModel):
+    """RTP configuration settings"""
+    rtp_symmetric: str = Field(default="yes", pattern=r'^(yes|no)$')
+    rtp_timeout: int = Field(default=30, ge=0, le=300)
+    rtp_timeout_hold: int = Field(default=60, ge=0, le=3600)
+    sdp_session: str = Field(default="Asterisk")
+
+class RecordingSettings(BaseModel):
+    """Recording configuration settings"""
+    record_calls: str = Field(default="yes", pattern=r'^(yes|no)$')
+    one_touch_recording: str = Field(default="yes", pattern=r'^(yes|no)$')
+    record_on_feature: str = Field(default="*1")
+    record_off_feature: str = Field(default="*2")
+
+class CallSettings(BaseModel):
+    """Call handling configuration settings"""
+    context: str = Field(default="internal", pattern=r'^[a-zA-Z0-9_-]+$')
+    callerid: Optional[str] = Field(None, max_length=100)
+    callerid_privacy: Optional[str] = Field(default="")
+    connected_line_method: str = Field(default="invite")
+    call_group: Optional[str] = Field(default="1")
+    pickup_group: Optional[str] = Field(default="1")
+    device_state_busy_at: int = Field(default=2, ge=1, le=10)
+
+class PresenceSettings(BaseModel):
+    """Presence and subscription settings"""
+    allow_subscribe: str = Field(default="yes", pattern=r'^(yes|no)$')
+    send_pai: str = Field(default="yes", pattern=r'^(yes|no)$')
+    send_rpid: str = Field(default="yes", pattern=r'^(yes|no)$')
+    rel100: str = Field(default="no", pattern=r'^(yes|no)$', alias="100rel")
+
+class VoicemailSettings(BaseModel):
+    """Voicemail configuration settings"""
+    mailboxes: Optional[str] = Field(default="")
+    voicemail_extension: Optional[str] = Field(default="")
+
 class AuthConfig(BaseModel):
     """Authentication configuration"""
     type: str = Field(default="auth")
@@ -24,98 +84,26 @@ class AORConfig(BaseModel):
     maximum_expiration: Optional[int] = Field(default=7200)
 
 class AdvancedEndpoint(BaseModel):
-    """Advanced PJSIP Endpoint with all configuration options"""
+    """Advanced PJSIP Endpoint with all configuration options organized by category"""
     
     # Basic identification
     id: str = Field(..., min_length=1, max_length=50, pattern=r'^[a-zA-Z0-9_-]+$')
     type: str = Field(default="endpoint")
     entity_type: str = Field(default="endpoint")
     name: Optional[str] = Field(None, max_length=100, description="Display name for endpoint")
-    
-    # Account and billing
     accountcode: Optional[str] = Field(None, max_length=20)
     
-    # Audio and media settings
-    max_audio_streams: int = Field(default=2, ge=1, le=10)
-    device_state_busy_at: int = Field(default=2, ge=1, le=10)
-    allow_transfer: str = Field(default="yes", pattern=r'^(yes|no)$')
+    # Organized settings
+    audio_media: AudioMediaSettings = Field(default_factory=AudioMediaSettings)
+    transport_network: TransportNetworkSettings = Field(default_factory=TransportNetworkSettings)
+    rtp: RTPSettings = Field(default_factory=RTPSettings)
+    recording: RecordingSettings = Field(default_factory=RecordingSettings)
+    call: CallSettings = Field(default_factory=CallSettings)
+    presence: PresenceSettings = Field(default_factory=PresenceSettings)
+    voicemail: VoicemailSettings = Field(default_factory=VoicemailSettings)
     
-    # Authentication
-    outbound_auth: Optional[str] = Field(default="")
+    # Authentication and AOR
     auth: AuthConfig
-    
-    # Context and routing
-    context: str = Field(default="internal", pattern=r'^[a-zA-Z0-9_-]+$')
-    
-    # Caller ID settings
-    callerid: Optional[str] = Field(None, max_length=100)
-    callerid_privacy: Optional[str] = Field(default="")
-    connected_line_method: str = Field(default="invite")
-    from_user: Optional[str] = Field(None, max_length=50)
-    from_domain: Optional[str] = Field(default="")
-    
-    # Transport and network
-    transport: str = Field(default="transport-udp")
-    identify_by: str = Field(default="username")
-    deny: Optional[str] = Field(default="")
-    permit: Optional[str] = Field(default="")
-    force_rport: str = Field(default="yes", pattern=r'^(yes|no)$')
-    rewrite_contact: str = Field(default="yes", pattern=r'^(yes|no)$')
-    
-    # Codec settings
-    allow: str = Field(default="ulaw,alaw")
-    disallow: str = Field(default="all")
-    
-    # WebRTC settings
-    webrtc: str = Field(default="no", pattern=r'^(yes|no)$')
-    ice_support: str = Field(default="no", pattern=r'^(yes|no)$')
-    
-    # Music on hold
-    moh_suggest: str = Field(default="default")
-    
-    # Call groups
-    call_group: Optional[str] = Field(default="1")
-    pickup_group: Optional[str] = Field(default="1")
-    
-    # RTP settings
-    rtp_symmetric: str = Field(default="yes", pattern=r'^(yes|no)$')
-    rtp_timeout: int = Field(default=30, ge=0, le=300)
-    rtp_timeout_hold: int = Field(default=60, ge=0, le=3600)
-    direct_media: str = Field(default="no", pattern=r'^(yes|no)$')
-    
-    # Recording settings
-    one_touch_recording: str = Field(default="yes", pattern=r'^(yes|no)$')
-    record_on_feature: str = Field(default="*1")
-    record_off_feature: str = Field(default="*2")
-    record_calls: str = Field(default="yes", pattern=r'^(yes|no)$')
-    
-    # Voicemail settings
-    mailboxes: Optional[str] = Field(default="")
-    voicemail_extension: Optional[str] = Field(default="")
-    
-    # Subscription and presence
-    allow_subscribe: str = Field(default="yes", pattern=r'^(yes|no)$')
-    
-    # DTMF and signaling
-    dtmf_mode: str = Field(default="rfc4733")
-    rel100: str = Field(default="no", pattern=r'^(yes|no)$', alias="100rel")
-    
-    # SDP settings
-    sdp_session: str = Field(default="Asterisk")
-    
-    # Variables and custom settings
-    set_var: Optional[str] = Field(default="")
-    tone_zone: str = Field(default="us")
-    
-    # Privacy and identification
-    send_pai: str = Field(default="yes", pattern=r'^(yes|no)$')
-    send_rpid: str = Field(default="yes", pattern=r'^(yes|no)$')
-    
-    # Hardware and provisioning
-    mac_address: Optional[str] = Field(None, pattern=r'^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$')
-    auto_provisioning_enabled: bool = Field(default=True)
-    
-    # AOR configuration
     aor: AORConfig
     
     # Timestamps
@@ -126,7 +114,26 @@ class AdvancedEndpoint(BaseModel):
         from_attributes = True
         populate_by_name = True
 
-    @field_validator('allow')
+    def to_flat_dict(self) -> Dict[str, Any]:
+        """Convert nested structure to flat dictionary for PJSIP config"""
+        flat_dict = {
+            'id': self.id,
+            'type': self.type,
+            'entity_type': self.entity_type,
+            'name': self.name,
+            'accountcode': self.accountcode,
+            'auth': self.auth.model_dump(),
+            'aor': self.aor.model_dump()
+        }
+        
+        # Flatten all settings
+        for section in [self.audio_media, self.transport_network, self.rtp, 
+                       self.recording, self.call, self.presence, self.voicemail]:
+            flat_dict.update(section.model_dump())
+        
+        return flat_dict
+
+    @field_validator('audio_media.allow')
     @classmethod
     def validate_codecs(cls, v):
         if not v or v == "all":
@@ -138,7 +145,7 @@ class AdvancedEndpoint(BaseModel):
                 raise ValueError(f'Invalid codec: {codec}')
         return v
 
-    @field_validator('callerid')
+    @field_validator('call.callerid')
     @classmethod
     def validate_callerid(cls, v):
         if v and not re.match(r'^[\w\s<>@.-]+$', v):
@@ -214,31 +221,36 @@ class BulkEndpointCreate(BaseModel):
     overwrite_existing: bool = Field(default=False)
 
 # Response models
+class EndpointListResponse(BaseModel):
+    """Response model for listing endpoints with organized sections"""
+    success: bool
+    count: int
+    endpoints: List[Dict[str, Any]]
+
 class StatusResponse(BaseModel):
+    """Generic status response"""
     success: bool
     message: str
     details: Optional[Dict[str, Any]] = None
 
 class ReloadResponse(BaseModel):
+    """Response for reload operations"""
     success: bool
     message: str
     output: Optional[str] = None
 
 class ConfigResponse(BaseModel):
+    """Response for configuration operations"""
     success: bool
     config: str
     timestamp: str
 
 class EndpointValidation(BaseModel):
+    """Response for endpoint validation"""
     endpoint_id: str
     exists: bool
     available: bool
     conflicts: Optional[List[str]] = None
-
-class EndpointListResponse(BaseModel):
-    success: bool
-    count: int
-    endpoints: List[Dict[str, Any]]
 
 # Legacy compatibility
 class Endpoint(SimpleEndpoint):

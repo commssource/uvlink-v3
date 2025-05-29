@@ -349,3 +349,110 @@ class AdvancedPJSIPConfigParser:
         except Exception as e:
             logger.error(f"Failed to save configuration: {e}")
             return False
+    
+    def add_endpoint_efficient(self, endpoint_data: Dict[str, Any]) -> bool:
+        """Add an endpoint efficiently by scanning the file instead of full parsing"""
+        endpoint_id = endpoint_data['id']
+        
+        # First check if endpoint exists by scanning file
+        with open(self.config_path, 'r') as f:
+            for line in f:
+                if line.strip() == f'[{endpoint_id}]':
+                    logger.warning(f"Endpoint {endpoint_id} already exists")
+                    return False
+        
+        # Create backup
+        from shared.utils import create_backup
+        create_backup(self.config_path, f"pjsip_add_{endpoint_id}")
+        
+        # Prepare new sections
+        new_sections = []
+        
+        # Add endpoint section
+        new_sections.append(f"[{endpoint_id}]")
+        new_sections.append("type=endpoint")
+        
+        # Add only non-empty endpoint options
+        endpoint_options = {
+            'context': endpoint_data.get('context', 'internal'),
+            'auth': f"{endpoint_id}_auth",
+            'aors': f"{endpoint_id}_aor",
+            'allow': endpoint_data.get('allow'),
+            'disallow': endpoint_data.get('disallow'),
+            'transport': endpoint_data.get('transport'),
+            'callerid': endpoint_data.get('callerid'),
+            'webrtc': endpoint_data.get('webrtc'),
+            'force_rport': endpoint_data.get('force_rport'),
+            'rewrite_contact': endpoint_data.get('rewrite_contact'),
+            'rtp_symmetric': endpoint_data.get('rtp_symmetric'),
+            'rtp_timeout': endpoint_data.get('rtp_timeout'),
+            'rtp_timeout_hold': endpoint_data.get('rtp_timeout_hold'),
+            'direct_media': endpoint_data.get('direct_media'),
+            'ice_support': endpoint_data.get('ice_support'),
+            'dtmf_mode': endpoint_data.get('dtmf_mode'),
+            '100rel': endpoint_data.get('100rel'),
+            'send_pai': endpoint_data.get('send_pai'),
+            'send_rpid': endpoint_data.get('send_rpid'),
+            'from_user': endpoint_data.get('from_user'),
+            'from_domain': endpoint_data.get('from_domain'),
+            'moh_suggest': endpoint_data.get('moh_suggest'),
+            'call_group': endpoint_data.get('call_group'),
+            'pickup_group': endpoint_data.get('pickup_group'),
+            'record_calls': endpoint_data.get('record_calls'),
+            'one_touch_recording': endpoint_data.get('one_touch_recording'),
+            'record_on_feature': endpoint_data.get('record_on_feature'),
+            'record_off_feature': endpoint_data.get('record_off_feature'),
+            'allow_subscribe': endpoint_data.get('allow_subscribe'),
+            'sdp_session': endpoint_data.get('sdp_session'),
+            'tone_zone': endpoint_data.get('tone_zone')
+        }
+        
+        # Add only non-empty values
+        for key, value in endpoint_options.items():
+            if value is not None and str(value).strip():
+                new_sections.append(f"{key}={value}")
+        
+        # Add auth section
+        auth_section = f"{endpoint_id}_auth"
+        new_sections.append(f"\n[{auth_section}]")
+        new_sections.append("type=auth")
+        new_sections.append("auth_type=userpass")
+        
+        # Add only non-empty auth options
+        auth_data = endpoint_data.get('auth', {})
+        auth_options = {
+            'username': auth_data.get('username', endpoint_id),
+            'password': auth_data.get('password', ''),
+            'realm': auth_data.get('realm', 'UVLink')
+        }
+        
+        for key, value in auth_options.items():
+            if value is not None and str(value).strip():
+                new_sections.append(f"{key}={value}")
+        
+        # Add AOR section
+        aor_section = f"{endpoint_id}_aor"
+        new_sections.append(f"\n[{aor_section}]")
+        new_sections.append("type=aor")
+        
+        # Add only non-empty AOR options
+        aor_data = endpoint_data.get('aor', {})
+        aor_options = {
+            'max_contacts': aor_data.get('max_contacts', 2),
+            'qualify_frequency': aor_data.get('qualify_frequency'),
+            'authenticate_qualify': aor_data.get('authenticate_qualify'),
+            'default_expiration': aor_data.get('default_expiration'),
+            'minimum_expiration': aor_data.get('minimum_expiration'),
+            'maximum_expiration': aor_data.get('maximum_expiration')
+        }
+        
+        for key, value in aor_options.items():
+            if value is not None and str(value).strip():
+                new_sections.append(f"{key}={value}")
+        
+        # Append new sections to file
+        with open(self.config_path, 'a') as f:
+            f.write('\n' + '\n'.join(new_sections) + '\n')
+        
+        logger.info(f"Added endpoint {endpoint_id} efficiently")
+        return True
