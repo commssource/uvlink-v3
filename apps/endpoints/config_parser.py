@@ -40,6 +40,13 @@ class AdvancedPJSIPConfigParser:
             if section_match:
                 current_section = section_match.group(1)
                 
+                # Handle duplicate section names
+                if current_section in self.sections:
+                    if current_section not in section_counter:
+                        section_counter[current_section] = 1
+                    section_counter[current_section] += 1
+                    current_section = f"{current_section}_{section_counter[current_section]}"
+                
                 # Store section in order
                 if current_section not in self.order:
                     self.order.append(current_section)
@@ -60,16 +67,7 @@ class AdvancedPJSIPConfigParser:
                 key, value = line.split('=', 1)
                 key = key.strip()
                 value = value.strip()
-                
-                # Store the value in the current section
                 self.sections[current_section][key] = value
-                
-                # If this is an auth section, also store it under the base endpoint ID
-                if current_section.endswith('_auth'):
-                    base_id = current_section.replace('_auth', '')
-                    if base_id not in self.sections:
-                        self.sections[base_id] = {}
-                    self.sections[base_id][f'auth_{key}'] = value
         
         # Store any remaining comments
         if section_comments:
@@ -273,13 +271,9 @@ class AdvancedPJSIPConfigParser:
             if section_type == 'endpoint':
                 endpoint_sections[section_name] = section_data
             elif section_type == 'auth':
-                # Store auth section with the base endpoint ID
-                base_id = section_name.replace('_auth', '')
-                auth_sections[base_id] = section_data
+                auth_sections[section_name] = section_data
             elif section_type == 'aor':
-                # Store aor section with the base endpoint ID
-                base_id = section_name.replace('_aor', '')
-                aor_sections[base_id] = section_data
+                aor_sections[section_name] = section_data
         
         # Second pass: build complete endpoint info
         for section_name, section_data in endpoint_sections.items():
@@ -300,14 +294,14 @@ class AdvancedPJSIPConfigParser:
                 'callerid': section_data.get('callerid', ''),
                 'webrtc': section_data.get('webrtc', 'no'),
                 'auth': {
-                    'type': 'auth',
-                    'auth_type': 'userpass',
+                    'type': auth_data.get('type', 'auth'),
+                    'auth_type': auth_data.get('auth_type', 'userpass'),
                     'username': auth_data.get('username', section_name),
                     'password': auth_data.get('password', ''),
                     'realm': auth_data.get('realm', 'UVLink')
                 },
                 'aor': {
-                    'type': 'aor',
+                    'type': aor_data.get('type', 'aor'),
                     'max_contacts': int(aor_data.get('max_contacts', 2)),
                     'qualify_frequency': int(aor_data.get('qualify_frequency', 60)) if aor_data.get('qualify_frequency') else 60,
                     'remove_unavailable': aor_data.get('remove_unavailable', 'no')
@@ -436,11 +430,9 @@ class AdvancedPJSIPConfigParser:
             # Always add username and password
             username = auth_data.get('username', endpoint_id)
             password = auth_data.get('password', '')
-            realm = auth_data.get('realm', 'UVLink')
             
             new_sections.append(f"username={username}")
             new_sections.append(f"password={password}")  # Always add password, even if empty
-            new_sections.append(f"realm={realm}")
             
             # Add AOR section with all required fields
             new_sections.append(f"\n[{endpoint_id}]")

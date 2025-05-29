@@ -101,20 +101,8 @@ class AdvancedEndpointService:
                     'voicemail_extension': endpoint.get('voicemail_extension', '')
                 },
                 
-                'auth': {
-                    'type': 'auth',
-                    'auth_type': 'userpass',
-                    'username': endpoint.get('auth', {}).get('username', endpoint['id']),
-                    'password': endpoint.get('auth', {}).get('password', ''),
-                    'realm': endpoint.get('auth', {}).get('realm', 'UVLink')
-                },
-                
-                'aor': {
-                    'type': 'aor',
-                    'max_contacts': int(endpoint.get('aor', {}).get('max_contacts', 1)),
-                    'qualify_frequency': int(endpoint.get('aor', {}).get('qualify_frequency', 60)),
-                    'remove_unavailable': endpoint.get('aor', {}).get('remove_unavailable', 'no')
-                }
+                'auth': endpoint.get('auth', {}),
+                'aor': endpoint.get('aor', {})
             }
             organized_endpoints.append(organized)
         
