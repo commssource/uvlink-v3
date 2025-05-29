@@ -137,19 +137,30 @@ class AdvancedEndpointService:
                 'context': endpoint_data.get('context', 'internal'),
                 'allow': endpoint_data.get('allow', 'ulaw,alaw'),
                 'callerid': endpoint_data.get('callerid', ''),
-                'custom_data': endpoint_data.get('custom_data', {})
             }
+            
+            # Add custom data if present
+            if 'custom_data' in endpoint_data:
+                flat_data['custom_data'] = endpoint_data['custom_data']
             
             # Add auth section
             if 'auth' in endpoint_data:
                 auth_data = endpoint_data['auth'].copy()
-                auth_data['id'] = endpoint_id  # Use same ID as endpoint
+                # Ensure required auth fields are present
+                if 'username' not in auth_data:
+                    auth_data['username'] = endpoint_id
+                if 'password' not in auth_data:
+                    raise ValueError("Password is required in auth section")
+                if 'realm' not in auth_data:
+                    auth_data['realm'] = 'UVLink'
                 flat_data['auth'] = auth_data
             
             # Add AOR section
             if 'aor' in endpoint_data:
                 aor_data = endpoint_data['aor'].copy()
-                aor_data['id'] = endpoint_id  # Use same ID as endpoint
+                # Ensure required AOR fields are present
+                if 'max_contacts' not in aor_data:
+                    aor_data['max_contacts'] = 1
                 flat_data['aor'] = aor_data
             
             # Add any additional fields
