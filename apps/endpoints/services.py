@@ -568,16 +568,19 @@ class AdvancedEndpointService:
             }
             
             # Handle custom data
-            custom_data = {
-                'name': endpoint_data.get('name', f'Extension {endpoint_id}')
-            }
+            custom_data = {}
+            if 'name' in endpoint_data:
+                custom_data['name'] = endpoint_data['name']
+            elif 'custom_data' in endpoint_data and 'name' in endpoint_data['custom_data']:
+                custom_data['name'] = endpoint_data['custom_data']['name']
+            else:
+                custom_data['name'] = f'Extension {endpoint_id}'
             
             # Add any other custom data
             if 'custom_data' in endpoint_data:
-                custom_data.update({
-                    k: v for k, v in endpoint_data['custom_data'].items() 
-                    if v is not None
-                })
+                for k, v in endpoint_data['custom_data'].items():
+                    if k != 'name' and v is not None:
+                        custom_data[k] = v
             
             # Only add custom_data if it has values
             if custom_data:
@@ -594,11 +597,11 @@ class AdvancedEndpointService:
             
             # Update with provided auth data
             if 'auth' in endpoint_data:
-                if 'username' in endpoint_data['auth']:
+                if 'username' in endpoint_data['auth'] and endpoint_data['auth']['username'] is not None:
                     auth_data['username'] = endpoint_data['auth']['username']
-                if 'password' in endpoint_data['auth']:
+                if 'password' in endpoint_data['auth'] and endpoint_data['auth']['password'] is not None:
                     auth_data['password'] = endpoint_data['auth']['password']
-                if 'realm' in endpoint_data['auth']:
+                if 'realm' in endpoint_data['auth'] and endpoint_data['auth']['realm'] is not None:
                     auth_data['realm'] = endpoint_data['auth']['realm']
             
             complete_data['auth'] = auth_data
@@ -611,7 +614,7 @@ class AdvancedEndpointService:
             
             # Update with provided AOR data
             if 'aor' in endpoint_data:
-                if 'max_contacts' in endpoint_data['aor']:
+                if 'max_contacts' in endpoint_data['aor'] and endpoint_data['aor']['max_contacts'] is not None:
                     aor_data['max_contacts'] = endpoint_data['aor']['max_contacts']
             
             complete_data['aor'] = aor_data

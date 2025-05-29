@@ -404,7 +404,7 @@ class AdvancedPJSIPConfigParser:
             if 'custom_data' in endpoint_data and endpoint_data['custom_data']:
                 set_vars = []
                 for key, value in endpoint_data['custom_data'].items():
-                    if value is not None:
+                    if value is not None and value != 'None':
                         set_vars.append(f"{key}={value}")
                 if set_vars:
                     new_sections.append(f"set_var={','.join(set_vars)}")
@@ -417,17 +417,17 @@ class AdvancedPJSIPConfigParser:
             if 'auth' in endpoint_data:
                 auth_data = endpoint_data['auth']
                 # Ensure required auth fields are present
-                if 'username' not in auth_data:
-                    auth_data['username'] = endpoint_id
-                if 'password' not in auth_data:
-                    auth_data['password'] = ''
-                if 'realm' not in auth_data:
-                    auth_data['realm'] = 'UVLink'
+                username = auth_data.get('username', endpoint_id)
+                password = auth_data.get('password', '')
+                realm = auth_data.get('realm', 'UVLink')
                 
-                # Add auth fields
-                new_sections.append(f"username={auth_data['username']}")
-                new_sections.append(f"password={auth_data['password']}")
-                new_sections.append(f"realm={auth_data['realm']}")
+                # Only add non-None values
+                if username is not None and username != 'None':
+                    new_sections.append(f"username={username}")
+                if password is not None and password != 'None':
+                    new_sections.append(f"password={password}")
+                if realm is not None and realm != 'None':
+                    new_sections.append(f"realm={realm}")
             
             # Add AOR section
             new_sections.append(f"\n[{endpoint_id}]")
@@ -436,11 +436,9 @@ class AdvancedPJSIPConfigParser:
             if 'aor' in endpoint_data:
                 aor_data = endpoint_data['aor']
                 # Ensure required AOR fields are present
-                if 'max_contacts' not in aor_data:
-                    aor_data['max_contacts'] = 1
-                
-                # Add AOR fields
-                new_sections.append(f"max_contacts={aor_data['max_contacts']}")
+                max_contacts = aor_data.get('max_contacts', 1)
+                if max_contacts is not None and max_contacts != 'None':
+                    new_sections.append(f"max_contacts={max_contacts}")
             
             # Log final configuration
             logger.info("Final configuration:")
