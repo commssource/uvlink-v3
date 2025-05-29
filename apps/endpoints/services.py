@@ -4,6 +4,7 @@ import logging
 import re
 from typing import List, Optional, Dict, Any
 from datetime import datetime
+from fastapi import HTTPException
 
 from .schemas import (
     AdvancedEndpoint, SimpleEndpoint, EndpointCreate, EndpointUpdate,
@@ -100,8 +101,20 @@ class AdvancedEndpointService:
                     'voicemail_extension': endpoint.get('voicemail_extension', '')
                 },
                 
-                'auth': endpoint.get('auth', {}),
-                'aor': endpoint.get('aor', {})
+                'auth': {
+                    'type': 'auth',
+                    'auth_type': 'userpass',
+                    'username': endpoint.get('auth', {}).get('username', endpoint['id']),
+                    'password': endpoint.get('auth', {}).get('password', ''),
+                    'realm': endpoint.get('auth', {}).get('realm', 'UVLink')
+                },
+                
+                'aor': {
+                    'type': 'aor',
+                    'max_contacts': int(endpoint.get('aor', {}).get('max_contacts', 1)),
+                    'qualify_frequency': int(endpoint.get('aor', {}).get('qualify_frequency', 60)),
+                    'remove_unavailable': endpoint.get('aor', {}).get('remove_unavailable', 'no')
+                }
             }
             organized_endpoints.append(organized)
         

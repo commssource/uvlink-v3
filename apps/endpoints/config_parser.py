@@ -434,11 +434,17 @@ class AdvancedPJSIPConfigParser:
             new_sections.append(f"username={username}")
             new_sections.append(f"password={password}")  # Always add password, even if empty
             
-            # Add AOR section
+            # Add AOR section with all required fields
             new_sections.append(f"\n[{endpoint_id}]")
             new_sections.append("type=aor")
+            new_sections.append("max_contacts=1")
             new_sections.append("qualify_frequency=60")
             new_sections.append("qualify_timeout=8")
+            new_sections.append("remove_unavailable=yes")
+            new_sections.append("remove_existing=yes")
+            new_sections.append("default_expiration=3600")
+            new_sections.append("minimum_expiration=60")
+            new_sections.append("maximum_expiration=7200")
             
             # Log final configuration
             logger.info("Final configuration:")
