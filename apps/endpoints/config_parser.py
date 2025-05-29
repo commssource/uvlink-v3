@@ -40,13 +40,6 @@ class AdvancedPJSIPConfigParser:
             if section_match:
                 current_section = section_match.group(1)
                 
-                # Handle duplicate section names
-                if current_section in self.sections:
-                    if current_section not in section_counter:
-                        section_counter[current_section] = 1
-                    section_counter[current_section] += 1
-                    current_section = f"{current_section}_{section_counter[current_section]}"
-                
                 # Store section in order
                 if current_section not in self.order:
                     self.order.append(current_section)
@@ -67,7 +60,16 @@ class AdvancedPJSIPConfigParser:
                 key, value = line.split('=', 1)
                 key = key.strip()
                 value = value.strip()
+                
+                # Store the value in the current section
                 self.sections[current_section][key] = value
+                
+                # If this is an auth section, also store it under the base endpoint ID
+                if current_section.endswith('_auth'):
+                    base_id = current_section.replace('_auth', '')
+                    if base_id not in self.sections:
+                        self.sections[base_id] = {}
+                    self.sections[base_id][f'auth_{key}'] = value
         
         # Store any remaining comments
         if section_comments:
@@ -422,7 +424,7 @@ class AdvancedPJSIPConfigParser:
                     new_sections.append(f"callerid=Extension {endpoint_id} <{endpoint_id}>")
             
             # Add auth section
-            new_sections.append(f"\n[{endpoint_id}_auth]")
+            new_sections.append(f"\n[{endpoint_id}]")
             new_sections.append("type=auth")
             new_sections.append("auth_type=userpass")
             
@@ -441,7 +443,7 @@ class AdvancedPJSIPConfigParser:
             new_sections.append(f"realm={realm}")
             
             # Add AOR section with all required fields
-            new_sections.append(f"\n[{endpoint_id}_aor]")
+            new_sections.append(f"\n[{endpoint_id}]")
             new_sections.append("type=aor")
             new_sections.append("max_contacts=1")
             new_sections.append("qualify_frequency=60")
