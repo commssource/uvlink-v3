@@ -388,72 +388,34 @@ class AdvancedPJSIPConfigParser:
             
             # Prepare new sections
             new_sections = []
-            processed_keys = set()  # Track processed keys to avoid duplicates
             
-            # Valid PJSIP endpoint options with default values
-            default_options = {
-                'type': 'endpoint',
-                'auth': f"{endpoint_id}",
-                'aors': f"{endpoint_id}",
-                'context': 'internal',
-                'disallow': 'all',
-                'allow': 'ulaw,alaw',
-                'direct_media': 'true',
-                'dtmf_mode': 'rfc4733',
-                'force_rport': 'true',
-                'ice_support': 'false',
-                'identify_by': 'username,ip',
-                'moh_suggest': 'default',
-                'rewrite_contact': 'false',
-                'rtp_symmetric': 'false',
-                'rtp_timeout': '0',
-                'rtp_timeout_hold': '0',
-                'sdp_session': 'Asterisk',
-                'send_pai': 'false',
-                'send_rpid': 'false',
-                'webrtc': 'no',
-                '100rel': 'yes',
-                'callerid_privacy': 'allowed_not_screened',
-                'connected_line_method': 'invite',
-                'device_state_busy_at': '0',
-                'allow_subscribe': 'true',
-                'allow_transfer': 'true',
-                'tone_zone': '',
-                'mailboxes': '',
-                'voicemail_extension': ''
-            }
-            
-            # Add endpoint section with defaults
+            # Add endpoint section with exact configuration
             new_sections.append(f"[{endpoint_id}]")
-            for key, value in default_options.items():
-                new_sections.append(f"{key}={value}")
+            new_sections.append("type=endpoint")
+            new_sections.append(f"aors={endpoint_id}")
+            new_sections.append(f"accountcode={endpoint_id}")
+            new_sections.append(f"subscribe_context=t-{endpoint_id}")
+            new_sections.append("moh_suggest=default")
+            new_sections.append("notify_early_inuse_ringing=yes")
+            new_sections.append("refer_blind_progress=yes")
+            new_sections.append(f"auth={endpoint_id}")
+            new_sections.append(f"outbound_auth={endpoint_id}")
+            new_sections.append("direct_media=no")
+            new_sections.append("force_rport=yes")
+            new_sections.append("rtp_symmetric=yes")
+            new_sections.append("rewrite_contact=yes")
+            new_sections.append("dtmf_mode=rfc4733")
+            new_sections.append("context=t-internal")
+            new_sections.append("allow=alaw")
+            new_sections.append("use_ptime=no")
             
-            # Add basic fields and flatten nested objects
-            for key, value in endpoint_data.items():
-                if key not in ['id', 'type', 'auth', 'aor', 'custom_data', 'entity_type']:
-                    if isinstance(value, dict):
-                        # Flatten nested objects
-                        for nested_key, nested_value in value.items():
-                            if nested_value is not None and nested_value != 'None':
-                                # Fix 100rel field name
-                                if nested_key == 'rel100':
-                                    nested_key = '100rel'
-                                if nested_key not in processed_keys:
-                                    new_sections.append(f"{nested_key}={nested_value}")
-                                    processed_keys.add(nested_key)
-                    elif value is not None and value != 'None':
-                        if key not in processed_keys:
-                            new_sections.append(f"{key}={value}")
-                            processed_keys.add(key)
-            
-            # Add custom data using set_var
+            # Add callerid if provided in custom_data
             if 'custom_data' in endpoint_data and endpoint_data['custom_data']:
-                set_vars = []
-                for key, value in endpoint_data['custom_data'].items():
-                    if value is not None and value != 'None':
-                        set_vars.append(f"{key}={value}")
-                if set_vars:
-                    new_sections.append(f"set_var={','.join(set_vars)}")
+                name = endpoint_data['custom_data'].get('name')
+                if name:
+                    new_sections.append(f"callerid={name} <{endpoint_id}>")
+                else:
+                    new_sections.append(f"callerid=<{endpoint_id}>")
             
             # Add auth section
             new_sections.append(f"\n[{endpoint_id}]")
@@ -462,29 +424,19 @@ class AdvancedPJSIPConfigParser:
             
             if 'auth' in endpoint_data:
                 auth_data = endpoint_data['auth']
-                # Ensure required auth fields are present
                 username = auth_data.get('username', endpoint_id)
                 password = auth_data.get('password', '')
-                realm = auth_data.get('realm', 'UVLink')
                 
-                # Only add non-None values
                 if username is not None and username != 'None':
                     new_sections.append(f"username={username}")
                 if password is not None and password != 'None':
                     new_sections.append(f"password={password}")
-                if realm is not None and realm != 'None':
-                    new_sections.append(f"realm={realm}")
             
             # Add AOR section
             new_sections.append(f"\n[{endpoint_id}]")
             new_sections.append("type=aor")
-            
-            if 'aor' in endpoint_data:
-                aor_data = endpoint_data['aor']
-                # Add all non-None AOR fields
-                for key, value in aor_data.items():
-                    if key not in ['id', 'type', 'entity_type'] and value is not None and value != 'None':
-                        new_sections.append(f"{key}={value}")
+            new_sections.append("qualify_frequency=60")
+            new_sections.append("qualify_timeout=8")
             
             # Log final configuration
             logger.info("Final configuration:")
