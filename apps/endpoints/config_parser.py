@@ -427,14 +427,12 @@ class AdvancedPJSIPConfigParser:
             if not auth_data and 'endpoint_settings' in endpoint_data:
                 auth_data = endpoint_data['endpoint_settings']
             
-            # Ensure required auth fields are present
+            # Always add username and password
             username = auth_data.get('username', endpoint_id)
             password = auth_data.get('password', '')
             
-            # Always add username and password
             new_sections.append(f"username={username}")
-            if password:
-                new_sections.append(f"password={password}")
+            new_sections.append(f"password={password}")  # Always add password, even if empty
             
             # Add AOR section
             new_sections.append(f"\n[{endpoint_id}]")
