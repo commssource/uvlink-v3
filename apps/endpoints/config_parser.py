@@ -390,23 +390,43 @@ class AdvancedPJSIPConfigParser:
             new_sections = []
             processed_keys = set()  # Track processed keys to avoid duplicates
             
-            # Valid PJSIP endpoint options
-            valid_endpoint_options = {
-                'type', 'auth', 'aors', 'context', 'disallow', 'allow', 'direct_media',
-                'dtmf_mode', 'external_media_address', 'force_rport', 'ice_support',
-                'identify_by', 'mailboxes', 'moh_suggest', 'outbound_auth',
-                'rewrite_contact', 'rtp_symmetric', 'rtp_timeout', 'rtp_timeout_hold',
-                'send_pai', 'send_rpid', 'sdp_session', 'tone_zone', 'transport',
-                'trust_id_inbound', 'trust_id_outbound', 'webrtc', '100rel',
-                'callerid', 'callerid_privacy', 'connected_line_method',
-                'device_state_busy_at', 'pickup_group', 'call_group'
+            # Valid PJSIP endpoint options with default values
+            default_options = {
+                'type': 'endpoint',
+                'auth': f"{endpoint_id}",
+                'aors': f"{endpoint_id}",
+                'context': 'internal',
+                'disallow': 'all',
+                'allow': 'ulaw,alaw',
+                'direct_media': 'true',
+                'dtmf_mode': 'rfc4733',
+                'force_rport': 'true',
+                'ice_support': 'false',
+                'identify_by': 'username,ip',
+                'moh_suggest': 'default',
+                'rewrite_contact': 'false',
+                'rtp_symmetric': 'false',
+                'rtp_timeout': '0',
+                'rtp_timeout_hold': '0',
+                'sdp_session': 'Asterisk',
+                'send_pai': 'false',
+                'send_rpid': 'false',
+                'webrtc': 'no',
+                '100rel': 'yes',
+                'callerid_privacy': 'allowed_not_screened',
+                'connected_line_method': 'invite',
+                'device_state_busy_at': '0',
+                'allow_subscribe': 'true',
+                'allow_transfer': 'true',
+                'tone_zone': '',
+                'mailboxes': '',
+                'voicemail_extension': ''
             }
             
-            # Add endpoint section
+            # Add endpoint section with defaults
             new_sections.append(f"[{endpoint_id}]")
-            new_sections.append("type=endpoint")
-            new_sections.append(f"auth={endpoint_id}")
-            new_sections.append(f"aors={endpoint_id}")
+            for key, value in default_options.items():
+                new_sections.append(f"{key}={value}")
             
             # Add basic fields and flatten nested objects
             for key, value in endpoint_data.items():
@@ -418,13 +438,11 @@ class AdvancedPJSIPConfigParser:
                                 # Fix 100rel field name
                                 if nested_key == 'rel100':
                                     nested_key = '100rel'
-                                # Only add valid PJSIP options
-                                if nested_key in valid_endpoint_options and nested_key not in processed_keys:
+                                if nested_key not in processed_keys:
                                     new_sections.append(f"{nested_key}={nested_value}")
                                     processed_keys.add(nested_key)
                     elif value is not None and value != 'None':
-                        # Only add valid PJSIP options
-                        if key in valid_endpoint_options and key not in processed_keys:
+                        if key not in processed_keys:
                             new_sections.append(f"{key}={value}")
                             processed_keys.add(key)
             
