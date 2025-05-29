@@ -126,7 +126,8 @@ class AdvancedEndpointService:
         flat_data = {}
         
         # Basic fields
-        flat_data['id'] = endpoint_json['id']
+        endpoint_id = endpoint_json['id']
+        flat_data['id'] = endpoint_id
         flat_data['type'] = endpoint_json.get('type', 'endpoint')
         flat_data['name'] = endpoint_json.get('name')
         flat_data['accountcode'] = endpoint_json.get('accountcode')
@@ -147,9 +148,16 @@ class AdvancedEndpointService:
                 if value is not None:
                     flat_data[key] = value
         
-        # Auth and AOR
-        flat_data['auth'] = endpoint_json.get('auth', {})
-        flat_data['aor'] = endpoint_json.get('aor', {})
+        # Auth and AOR - use same ID as endpoint
+        if 'auth' in endpoint_json:
+            auth_data = endpoint_json['auth'].copy()
+            auth_data['id'] = endpoint_id  # Use same ID as endpoint
+            flat_data['auth'] = auth_data
+        
+        if 'aor' in endpoint_json:
+            aor_data = endpoint_json['aor'].copy()
+            aor_data['id'] = endpoint_id  # Use same ID as endpoint
+            flat_data['aor'] = aor_data
         
         # Use efficient method for new endpoints
         parser = AdvancedPJSIPConfigParser(ASTERISK_PJSIP_CONFIG)
@@ -166,11 +174,13 @@ class AdvancedEndpointService:
             'allow': ','.join(endpoint_data.codecs),
             'callerid': endpoint_data.callerid or "",
             'auth': {
+                'id': endpoint_data.id,  # Use same ID as endpoint
                 'username': endpoint_data.username,
                 'password': endpoint_data.password,
                 'realm': 'UVLink'
             },
             'aor': {
+                'id': endpoint_data.id,  # Use same ID as endpoint
                 'max_contacts': endpoint_data.max_contacts
             }
         }
@@ -214,16 +224,23 @@ class AdvancedEndpointService:
                     'allow': ','.join(endpoint.codecs),
                     'callerid': endpoint.callerid or "",
                     'auth': {
+                        'id': endpoint.id,  # Use same ID as endpoint
                         'username': endpoint.username,
                         'password': endpoint.password,
                         'realm': 'UVLink'
                     },
                     'aor': {
+                        'id': endpoint.id,  # Use same ID as endpoint
                         'max_contacts': endpoint.max_contacts
                     }
                 }
             else:  # AdvancedEndpoint
                 advanced_data = endpoint.model_dump()
+                # Ensure auth and aor use same ID
+                if 'auth' in advanced_data:
+                    advanced_data['auth']['id'] = endpoint_id
+                if 'aor' in advanced_data:
+                    advanced_data['aor']['id'] = endpoint_id
             
             # Try to add
             if parser.add_advanced_endpoint(advanced_data):
