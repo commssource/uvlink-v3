@@ -375,7 +375,7 @@ class AdvancedPJSIPConfigParser:
             
             # Write to file
             with open(self.config_path, 'w') as f:
-                f.write('\n'.join(content_lines))
+                f.write('\n'.join(content_lines)+ '\n')
             
             logger.info(f"Configuration saved to {self.config_path}")
             return True
@@ -463,7 +463,7 @@ class AdvancedPJSIPConfigParser:
             
             # Append new sections to file
             with open(self.config_path, 'a') as f:
-                f.write('\n'.join(new_sections)+ '\n')
+                f.write('\n'.join(new_sections))
             
             logger.info(f"Added endpoint {endpoint_id} efficiently")
             return True
