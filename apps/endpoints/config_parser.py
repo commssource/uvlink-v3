@@ -130,7 +130,7 @@ class AdvancedPJSIPConfigParser:
             if key == "aors":
                 value = endpoint_data.get("aors", endpoint_id)
             elif key == "auth" or key == "outbound_auth":
-                value = endpoint_data.get(key, f"{endpoint_id}-auth")
+                value = f"{endpoint_id}-auth"
             else:
                 value = endpoint_data.get(key, default)
             if value != "" and value is not None:
@@ -358,7 +358,7 @@ class AdvancedPJSIPConfigParser:
                 if key == "aors":
                     value = endpoint_data.get("aors", endpoint_id)
                 elif key == "auth" or key == "outbound_auth":
-                    value = endpoint_data.get(key, f"{endpoint_id}-auth")
+                    value = f"{endpoint_id}-auth"
                 else:
                     value = endpoint_data.get(key, default)
                 if value != "" and value is not None:
