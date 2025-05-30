@@ -223,14 +223,9 @@ class AdvancedPJSIPConfigParser:
         
         # Update auth section if provided
         if 'auth' in endpoint_data and endpoint_data['auth']:
-            # Find the auth section by checking all sections with the same base ID
-            auth_section = None
-            for section_name in self.sections:
-                if section_name.startswith(endpoint_id) and self.sections[section_name].get('type') == 'auth':
-                    auth_section = section_name
-                    break
-            
-            if auth_section:
+            # Use same ID for auth section
+            auth_section = endpoint_id
+            if auth_section in self.sections:
                 auth_data = endpoint_data['auth']
                 for key, value in auth_data.items():
                     if value is not None:
@@ -238,14 +233,9 @@ class AdvancedPJSIPConfigParser:
         
         # Update AOR section if provided
         if 'aor' in endpoint_data and endpoint_data['aor']:
-            # Find the aor section by checking all sections with the same base ID
-            aor_section = None
-            for section_name in self.sections:
-                if section_name.startswith(endpoint_id) and self.sections[section_name].get('type') == 'aor':
-                    aor_section = section_name
-                    break
-            
-            if aor_section:
+            # Use same ID for aor section
+            aor_section = endpoint_id
+            if aor_section in self.sections:
                 aor_data = endpoint_data['aor']
                 for key, value in aor_data.items():
                     if value is not None:
@@ -434,7 +424,7 @@ class AdvancedPJSIPConfigParser:
                 else:
                     new_sections.append(f"callerid=Extension {endpoint_id} <{endpoint_id}>")
             
-            # Add auth section
+            # Add auth section with same ID
             new_sections.append(f"\n[{endpoint_id}]")
             new_sections.append("type=auth")
             new_sections.append("auth_type=userpass")
@@ -451,7 +441,7 @@ class AdvancedPJSIPConfigParser:
             new_sections.append(f"username={username}")
             new_sections.append(f"password={password}")  # Always add password, even if empty
             
-            # Add AOR section with all required fields
+            # Add AOR section with same ID
             new_sections.append(f"\n[{endpoint_id}]")
             new_sections.append("type=aor")
             new_sections.append("max_contacts=1")
