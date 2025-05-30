@@ -92,8 +92,9 @@ class AdvancedPJSIPConfigParser:
         aor_section = f"{endpoint_id}"
         if aor_section in self.sections:
             related_sections.append(aor_section)
-        
+            print(f"AOR-AUTH Section: {related_sections}")
         return related_sections
+        
     
     def add_advanced_endpoint(self, endpoint_data: Dict[str, Any]) -> bool:
         """Add an advanced endpoint with all configuration options"""
