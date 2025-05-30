@@ -27,6 +27,94 @@ class AdvancedEndpointService:
         return parser
     
     @staticmethod
+    def _build_organized_endpoint(endpoint: Dict[str, Any], parser: AdvancedPJSIPConfigParser) -> Dict[str, Any]:
+        """Helper method to build organized endpoint data"""
+        # Get auth section data by checking section type
+        auth_data = {}
+        for section_name, section_data in parser.sections.items():
+            # Check if this section has type=auth
+            if section_data.get('type') == 'auth':
+                auth_data = section_data
+                break
+        
+        return {
+            'id': endpoint['id'],
+            'type': endpoint['type'],
+            'name': endpoint.get('name', f"Extension {endpoint['id']}"),
+            'accountcode': endpoint.get('accountcode'),
+            
+            'audio_media': {
+                'max_audio_streams': int(endpoint.get('max_audio_streams', 2)),
+                'allow': endpoint.get('allow', 'ulaw,alaw'),
+                'disallow': endpoint.get('disallow', 'all'),
+                'moh_suggest': endpoint.get('moh_suggest', 'default'),
+                'tone_zone': endpoint.get('tone_zone', 'us'),
+                'dtmf_mode': endpoint.get('dtmf_mode', 'rfc4733'),
+                'allow_transfer': endpoint.get('allow_transfer', 'yes')
+            },
+            
+            'transport_network': {
+                'transport': endpoint.get('transport', 'transport-udp'),
+                'identify_by': endpoint.get('identify_by', 'username'),
+                'deny': endpoint.get('deny', ''),
+                'permit': endpoint.get('permit', ''),
+                'force_rport': endpoint.get('force_rport', 'yes'),
+                'rewrite_contact': endpoint.get('rewrite_contact', 'yes'),
+                'from_user': endpoint.get('from_user'),
+                'from_domain': endpoint.get('from_domain', ''),
+                'direct_media': endpoint.get('direct_media', 'no'),
+                'ice_support': endpoint.get('ice_support', 'no'),
+                'webrtc': endpoint.get('webrtc', 'no')
+            },
+            
+            'rtp': {
+                'rtp_symmetric': endpoint.get('rtp_symmetric', 'yes'),
+                'rtp_timeout': int(endpoint.get('rtp_timeout', 30)),
+                'rtp_timeout_hold': int(endpoint.get('rtp_timeout_hold', 60)),
+                'sdp_session': endpoint.get('sdp_session', 'Asterisk')
+            },
+            
+            'recording': {
+                'record_calls': endpoint.get('record_calls', 'yes'),
+                'one_touch_recording': endpoint.get('one_touch_recording', 'yes'),
+                'record_on_feature': endpoint.get('record_on_feature', '*1'),
+                'record_off_feature': endpoint.get('record_off_feature', '*2')
+            },
+            
+            'call': {
+                'context': endpoint.get('context', 'internal'),
+                'callerid': endpoint.get('callerid', ''),
+                'callerid_privacy': endpoint.get('callerid_privacy', ''),
+                'connected_line_method': endpoint.get('connected_line_method', 'invite'),
+                'call_group': endpoint.get('call_group', '1'),
+                'pickup_group': endpoint.get('pickup_group', '1'),
+                'device_state_busy_at': int(endpoint.get('device_state_busy_at', 2))
+            },
+            
+            'presence': {
+                'allow_subscribe': endpoint.get('allow_subscribe', 'yes'),
+                'send_pai': endpoint.get('send_pai', 'yes'),
+                'send_rpid': endpoint.get('send_rpid', 'yes'),
+                '100rel': endpoint.get('100rel', 'no')
+            },
+            
+            'voicemail': {
+                'mailboxes': endpoint.get('mailboxes', ''),
+                'voicemail_extension': endpoint.get('voicemail_extension', '')
+            },
+            
+            'auth': {
+                'type': 'auth',
+                'auth_type': 'userpass',
+                'username': auth_data.get('username', endpoint['id']),
+                'password': auth_data.get('password', ''),  # Get password from auth section
+                'realm': auth_data.get('realm', 'UVLink')
+            },
+            
+            'aor': endpoint.get('aor', {})
+        }
+    
+    @staticmethod
     def list_endpoints() -> List[Dict[str, Any]]:
         """List all endpoints from current configuration with organized sections"""
         parser = AdvancedEndpointService.get_parser()
@@ -35,91 +123,7 @@ class AdvancedEndpointService:
         # Organize endpoints into sections
         organized_endpoints = []
         for endpoint in endpoints:
-            # Get auth section data by checking section type
-            auth_data = {}
-            for section_name, section_data in parser.sections.items():
-                # Check if this section has type=auth
-                if section_data.get('type') == 'auth':
-                    auth_data = section_data
-                    break
-            
-            organized = {
-                'id': endpoint['id'],
-                'type': endpoint['type'],
-                'name': endpoint.get('name', f"Extension {endpoint['id']}"),
-                'accountcode': endpoint.get('accountcode'),
-                
-                'audio_media': {
-                    'max_audio_streams': int(endpoint.get('max_audio_streams', 2)),
-                    'allow': endpoint.get('allow', 'ulaw,alaw'),
-                    'disallow': endpoint.get('disallow', 'all'),
-                    'moh_suggest': endpoint.get('moh_suggest', 'default'),
-                    'tone_zone': endpoint.get('tone_zone', 'us'),
-                    'dtmf_mode': endpoint.get('dtmf_mode', 'rfc4733'),
-                    'allow_transfer': endpoint.get('allow_transfer', 'yes')
-                },
-                
-                'transport_network': {
-                    'transport': endpoint.get('transport', 'transport-udp'),
-                    'identify_by': endpoint.get('identify_by', 'username'),
-                    'deny': endpoint.get('deny', ''),
-                    'permit': endpoint.get('permit', ''),
-                    'force_rport': endpoint.get('force_rport', 'yes'),
-                    'rewrite_contact': endpoint.get('rewrite_contact', 'yes'),
-                    'from_user': endpoint.get('from_user'),
-                    'from_domain': endpoint.get('from_domain', ''),
-                    'direct_media': endpoint.get('direct_media', 'no'),
-                    'ice_support': endpoint.get('ice_support', 'no'),
-                    'webrtc': endpoint.get('webrtc', 'no')
-                },
-                
-                'rtp': {
-                    'rtp_symmetric': endpoint.get('rtp_symmetric', 'yes'),
-                    'rtp_timeout': int(endpoint.get('rtp_timeout', 30)),
-                    'rtp_timeout_hold': int(endpoint.get('rtp_timeout_hold', 60)),
-                    'sdp_session': endpoint.get('sdp_session', 'Asterisk')
-                },
-                
-                'recording': {
-                    'record_calls': endpoint.get('record_calls', 'yes'),
-                    'one_touch_recording': endpoint.get('one_touch_recording', 'yes'),
-                    'record_on_feature': endpoint.get('record_on_feature', '*1'),
-                    'record_off_feature': endpoint.get('record_off_feature', '*2')
-                },
-                
-                'call': {
-                    'context': endpoint.get('context', 'internal'),
-                    'callerid': endpoint.get('callerid', ''),
-                    'callerid_privacy': endpoint.get('callerid_privacy', ''),
-                    'connected_line_method': endpoint.get('connected_line_method', 'invite'),
-                    'call_group': endpoint.get('call_group', '1'),
-                    'pickup_group': endpoint.get('pickup_group', '1'),
-                    'device_state_busy_at': int(endpoint.get('device_state_busy_at', 2))
-                },
-                
-                'presence': {
-                    'allow_subscribe': endpoint.get('allow_subscribe', 'yes'),
-                    'send_pai': endpoint.get('send_pai', 'yes'),
-                    'send_rpid': endpoint.get('send_rpid', 'yes'),
-                    '100rel': endpoint.get('100rel', 'no')
-                },
-                
-                'voicemail': {
-                    'mailboxes': endpoint.get('mailboxes', ''),
-                    'voicemail_extension': endpoint.get('voicemail_extension', '')
-                },
-                
-                'auth': {
-                    'type': 'auth',
-                    'auth_type': 'userpass',
-                    'username': auth_data.get('username', endpoint['id']),
-                    'password': auth_data.get('password', ''),  # Get password from auth section
-                    'realm': auth_data.get('realm', 'UVLink')
-                },
-                
-                'aor': endpoint.get('aor', {})
-            }
-            organized_endpoints.append(organized)
+            organized_endpoints.append(AdvancedEndpointService._build_organized_endpoint(endpoint, parser))
         
         return organized_endpoints
     
@@ -131,7 +135,7 @@ class AdvancedEndpointService:
         
         for endpoint in endpoints:
             if endpoint['id'] == endpoint_id:
-                return endpoint
+                return AdvancedEndpointService._build_organized_endpoint(endpoint, parser)
         
         return None
     
