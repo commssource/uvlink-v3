@@ -30,19 +30,23 @@ class AdvancedPJSIPConfigParser:
         for line_num, line in enumerate(content.split('\n'), 1):
             line = line.rstrip()
             
-            # Handle comments and empty lines
-            if line.startswith(';') or line.startswith('#') or not line.strip():
+            # Handle comments
+            if line.startswith(';') or line.startswith('#'):
                 section_comments.append(line)
                 continue
             
-            # Handle section headers [section_name]
+            # Ignore blank lines (do not store as comments)
+            if not line.strip():
+                continue
+            
+            # Handle section headers [section_name](template)
             section_match = re.match(r'^\[([^\]]+)\](?:\(([^)]+)\))?', line)
             if section_match:
                 section_name = section_match.group(1)
                 section_template = section_match.group(2)  # None if not present
                 section_key = (section_name, section_template)
                 
-                # Handle duplicate section names
+                # Handle duplicate section names (if needed)
                 if section_name in self.sections:
                     if section_name not in section_counter:
                         section_counter[section_name] = 1
@@ -72,7 +76,7 @@ class AdvancedPJSIPConfigParser:
                 value = value.strip()
                 self.sections[current_section][key] = value
         
-        # Store any remaining comments
+        # Store any remaining comments (not blank lines)
         if section_comments:
             self.comments['_end'] = section_comments
         
