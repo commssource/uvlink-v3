@@ -1,7 +1,9 @@
+
 endpoint:
   type: endpoint
   aors: ""
   auth: ""
+  transport: ""
   outbound_auth: ""
   context: internal
   accountcode: ""
@@ -29,3 +31,346 @@ aor:
   max_contacts: 1
   qualify_timeout: 8
   qualify_frequency: 60
+
+
+
+
+# ; Automatically generated
+# #tryinclude pjsip_nat.conf
+# [transport-tpl](!,transport-nat-localnet-tpl,transport-nat-external-tpl)
+# external_signaling_address=78.110.160.199
+# external_signaling_port=5060
+# external_media_address=78.110.160.199
+# tos=cs3
+# async_operations=32
+# allow_reload=no
+# local_net=10.200.200.0/24
+
+# [transport-secure-tpl](!,transport-nat-localnet-tpl,transport-nat-external-tpl)
+# cert_file=/etc/asterisk/asterisk.pem
+# priv_key_file=/etc/asterisk/asterisk.pem
+# cipher=ECDHE-RSA-AES128-GCM-SHA256,ECDHE-ECDSA-AES128-GCM-SHA256,ECDHE-RSA-AES128-SHA256,ECDHE-ECDSA-AES128-SHA256,ECDHE-RSA-AES128-SHA,ECDHE-ECDSA-AES128-SHA,AES128-GCM-SHA256,AES128-SHA256,AES128-SHA,ECDHE-RSA-AES256-GCM-SHA384,ECDHE-ECDSA-AES256-GCM-SHA384,ECDHE-RSA-AES256-SHA384,ECDHE-ECDSA-AES256-SHA384,ECDHE-RSA-AES256-SHA,ECDHE-ECDSA-AES256-SHA,AES256-GCM-SHA384,AES256-SHA256,AES256-SHA
+# method=sslv23
+# external_signaling_port=5061
+
+# [udp](transport-tpl)
+# protocol=udp
+# type=transport
+# bind=10.200.200.10:5060
+
+# [tcp](transport-tpl)
+# protocol=tcp
+# type=transport
+# bind=10.200.200.10:5060
+
+# [tls](transport-tpl,transport-secure-tpl)
+# protocol=tls
+# type=transport
+# bind=10.200.200.10:5061
+# tls_handshake_timeout=10
+# tls_tcp_keepalive=yes
+# tls_tcp_user_timeout=30
+
+# [global]
+# type=global
+# user_agent=S1.CSUC.CLOUD
+# max_initial_qualify_time=60
+# endpoint_identifier_order=ip,auth_username,username,anonymous
+# default_realm=S1.CSUC.CLOUD
+# mwi_tps_queue_high=1000
+# mwi_disable_initial_unsolicited=yes
+# keep_alive_interval=0
+# persistent_subscriptions=no
+
+# [system]
+# type=system
+# tcp_keep_alive=20
+# tls_keep_alive=20
+# threadpool_initial_size=20
+# threadpool_auto_increment=5
+# threadpool_idle_timeout=120
+# threadpool_max_size=100
+
+# [endpoint-tpl](!)
+# direct_media=no
+# context=invalid-context
+# language=uk
+# moh_suggest=default
+# force_rport=yes
+# rtp_symmetric=yes
+# rewrite_contact=yes
+# timers=no
+# rtp_timeout=60
+# send_pai=yes
+# dtmf_mode=auto
+# inband_progress=no
+# tos_audio=ef
+# tos_video=af41
+# t38_udptl=yes
+# disallow=all
+# suppress_q850_reason_headers=yes
+# media_encryption=sdes
+# media_encryption_optimistic=yes
+# media_address=10.200.200.10
+# bind_rtp_to_media_address=yes
+
+# [aor-tpl](!)
+# maximum_expiration=7200
+# default_expiration=3600
+# max_contacts=5
+
+# [endpoint-user-tpl](!)
+# set_var=PJSIP_HEADER(add,x-glocom-id)=${CHANNEL(parentid)}.${CHANNEL(endpoint)}
+
+# [webrtc-tpl](!)
+# media_encryption=dtls
+# media_encryption_optimistic=yes
+# dtls_verify=fingerprint
+# dtls_cert_file=/etc/asterisk/asterisk.dtls.pem
+# dtls_setup=actpass
+# use_avpf=yes
+# ice_support=yes
+# media_use_received_transport=yes
+# rtcp_mux=yes
+
+# #tryinclude pjsip_custom.conf
+
+# [S3TRUNK-1](endpoint-tpl)
+# type=endpoint
+# aors=S3TRUNK-1
+# accountcode=S3TRUNK-1
+# moh_suggest=default
+# notify_early_inuse_ringing=yes
+# refer_blind_progress=yes
+# outbound_auth=S3TRUNK-1-auth
+# direct_media=no
+# rpid_connectedline=no
+# dtmf_mode=rfc4733
+# context=S3TRUNK-1
+# allow=alaw
+# use_ptime=yes
+# identify_by=ip
+# deny=0.0.0.0/0.0.0.0
+# permit=10.200.200.12/255.255.255.255
+# subscribe_context=
+
+
+# [S3TRUNK-1](aor-tpl)
+# type=aor
+# max_contacts=0
+# qualify_frequency=0
+# contact=sip:10.200.200.12:5060
+# remove_existing=yes
+
+# [S3TRUNK-1-auth]
+# type=auth
+# auth_type=userpass
+# username=900201
+# password=k47Z*g*iZ90TeFQh
+
+# [S3TRUNK-1]
+# type=identify
+# endpoint=S3TRUNK-1
+# match=10.200.200.12
+
+# [N3TRUNK-202](endpoint-tpl)
+# type=endpoint
+# aors=N3TRUNK-202
+# accountcode=N3TRUNK-202
+# moh_suggest=default
+# notify_early_inuse_ringing=yes
+# refer_blind_progress=yes
+# outbound_auth=N3TRUNK-202-auth
+# direct_media=no
+# rpid_connectedline=no
+# dtmf_mode=rfc4733
+# context=N3TRUNK-202
+# send_pai=yes
+# allow=alaw
+# use_ptime=no
+# identify_by=ip
+# deny=0.0.0.0/0.0.0.0
+# permit=185.109.170.90/255.255.255.255
+# subscribe_context=
+
+
+# [N3TRUNK-202](aor-tpl)
+# type=aor
+# max_contacts=0
+# qualify_frequency=0
+# contact=sip:185.109.170.90:5060
+# remove_existing=yes
+
+# [N3TRUNK-202-auth]
+# type=auth
+# auth_type=userpass
+# username=900202
+# password=Mj1B*10K__zw9O3k
+
+# [N3TRUNK-202]
+# type=identify
+# endpoint=N3TRUNK-202
+# match=185.109.170.90
+
+# [N3TRUNK-202]
+# type=registration
+# outbound_auth=N3TRUNK-202-registerauth
+# transport=udp
+# server_uri=sip:185.109.170.90:5060
+# client_uri=sip:900202@185.109.170.90:5060
+# contact_user=900202
+# line=yes
+# endpoint=N3TRUNK-202
+# max_retries=60
+
+# [N3TRUNK-202-registerauth]
+# type=auth
+# auth_type=userpass
+# username=900202
+# password=Mj1B*10K__zw9O3k
+
+# [G-999-173512](endpoint-tpl)
+# type=endpoint
+# aors=G-999-173512
+# accountcode=G-999-173512
+# moh_suggest=default
+# notify_early_inuse_ringing=yes
+# refer_blind_progress=yes
+# direct_media=no
+# rpid_connectedline=no
+# dtmf_mode=rfc4733
+# context=G-999-173512
+# send_pai=yes
+# allow=alaw
+# use_ptime=no
+# identify_by=ip
+# deny=0.0.0.0/0.0.0.0
+# permit=88.215.55.11/255.255.255.255
+# permit=88.215.55.10/255.255.255.255
+# permit=88.215.55.12/255.255.255.255
+# permit=88.215.63.11/255.255.255.255
+# permit=88.215.63.10/255.255.255.255
+# permit=88.215.63.12/255.255.255.255
+# subscribe_context=
+
+
+# [G-999-173512](aor-tpl)
+# type=aor
+# max_contacts=0
+# qualify_frequency=0
+# contact=sip:88.215.55.11:5060
+# remove_existing=yes
+
+# [G-999-173512]
+# type=identify
+# endpoint=G-999-173512
+# match=88.215.55.11
+# match=88.215.55.10
+# match=88.215.55.12
+# match=88.215.63.11
+# match=88.215.63.10
+# match=88.215.63.12
+
+# [Twilio-UK-Trunk](endpoint-tpl)
+# type=endpoint
+# aors=Twilio-UK-Trunk
+# accountcode=Twilio-UK-Trunk
+# moh_suggest=default
+# notify_early_inuse_ringing=yes
+# refer_blind_progress=yes
+# outbound_auth=Twilio-UK-Trunk-auth
+# direct_media=no
+# rpid_connectedline=no
+# dtmf_mode=rfc4733
+# context=Twilio-UK-Trunk
+# allow=alaw
+# use_ptime=no
+# identify_by=ip
+# deny=0.0.0.0/0.0.0.0
+# permit=54.171.127.192/255.255.255.255
+# permit=54.171.127.193/255.255.255.255
+# permit=54.171.127.194/255.255.255.255
+# permit=54.171.127.195/255.255.255.255
+# permit=54.172.60.0/255.255.255.255
+# permit=54.172.60.1/255.255.255.255
+# permit=54.172.60.2/255.255.255.255
+# permit=54.172.60.3/255.255.255.255
+# permit=54.244.51.0/255.255.255.255
+# permit=54.244.51.1/255.255.255.255
+# permit=54.244.51.2/255.255.255.255
+# permit=54.244.51.3/255.255.255.255
+# subscribe_context=
+
+
+# [Twilio-UK-Trunk](aor-tpl)
+# type=aor
+# max_contacts=0
+# qualify_frequency=0
+# contact=sip:uvlink.pstn.dublin.twilio.com
+# remove_existing=yes
+
+# [Twilio-UK-Trunk-auth]
+# type=auth
+# auth_type=userpass
+# username=uvlink-cloud
+# password=mUYpERHHqQGpmH5
+
+# [Twilio-UK-Trunk]
+# type=identify
+# endpoint=Twilio-UK-Trunk
+# match=54.171.127.192
+# match=54.171.127.193
+# match=54.171.127.194
+# match=54.171.127.195
+# match=54.172.60.0
+# match=54.172.60.1
+# match=54.172.60.2
+# match=54.172.60.3
+# match=54.244.51.0
+# match=54.244.51.1
+# match=54.244.51.2
+# match=54.244.51.3
+
+# [Twilio-France-Trunk](endpoint-tpl)
+# type=endpoint
+# aors=Twilio-France-Trunk
+# accountcode=Twilio-France-Trunk
+# moh_suggest=default
+# notify_early_inuse_ringing=yes
+# refer_blind_progress=yes
+# outbound_auth=Twilio-France-Trunk-auth
+# direct_media=no
+# rpid_connectedline=no
+# dtmf_mode=rfc4733
+# context=Twilio-France-Trunk
+# allow=alaw
+# use_ptime=no
+# identify_by=ip
+# deny=0.0.0.0/0.0.0.0
+# permit=54.171.127.192/255.255.255.255
+# permit=54.171.127.193/255.255.255.255
+# permit=54.171.127.194/255.255.255.255
+# permit=54.171.127.195/255.255.255.255
+# subscribe_context=
+
+
+# [Twilio-France-Trunk](aor-tpl)
+# type=aor
+# max_contacts=0
+# qualify_frequency=0
+# contact=sip:uvlink.pstn.dublin.twilio.com
+# remove_existing=yes
+
+# [Twilio-France-Trunk-auth]
+# type=auth
+# auth_type=userpass
+# username=uvlink-cloud
+# password=mUYpERHHqQGpmH5
+
+# [Twilio-France-Trunk]
+# type=identify
+# endpoint=Twilio-France-Trunk
+# match=54.171.127.192
+# match=54.171.127.193
+# match=54.171.127.194
+# match=54.171.127.195
