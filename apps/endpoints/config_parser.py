@@ -27,8 +27,6 @@ class AdvancedPJSIPConfigParser:
         section_comments = []
         section_counter = {}  # Track number of sections with same name
         
-        logger.info("Starting to parse PJSIP config file")
-        
         for line_num, line in enumerate(content.split('\n'), 1):
             line = line.rstrip()
             
@@ -41,29 +39,13 @@ class AdvancedPJSIPConfigParser:
             section_match = re.match(r'^\[([^\]]+)\]', line)
             if section_match:
                 current_section = section_match.group(1)
-                logger.info(f"Found section: {current_section}")
                 
-                # Handle duplicate section names by checking type
+                # Handle duplicate section names
                 if current_section in self.sections:
-                    # Get the type of the existing section
-                    existing_type = self.sections[current_section].get('type')
-                    logger.info(f"Section {current_section} already exists with type {existing_type}")
-                    
-                    # Get the type of the new section from the first line after the section header
-                    next_line = content.split('\n')[line_num] if line_num < len(content.split('\n')) else ''
-                    new_type = next_line.split('=')[1].strip() if '=' in next_line else None
-                    logger.info(f"New section type: {new_type}")
-                    
-                    # If both sections are the same type, create a new numbered section
-                    if existing_type == new_type:
-                        if current_section not in section_counter:
-                            section_counter[current_section] = 1
-                        section_counter[current_section] += 1
-                        current_section = f"{current_section}_{section_counter[current_section]}"
-                        logger.info(f"Created new section: {current_section}")
-                    else:
-                        # For different types, use the same name
-                        logger.info(f"Using existing section name for different type: {current_section}")
+                    if current_section not in section_counter:
+                        section_counter[current_section] = 1
+                    section_counter[current_section] += 1
+                    current_section = f"{current_section}_{section_counter[current_section]}"
                 
                 # Store section in order
                 if current_section not in self.order:
@@ -86,13 +68,11 @@ class AdvancedPJSIPConfigParser:
                 key = key.strip()
                 value = value.strip()
                 self.sections[current_section][key] = value
-                logger.info(f"Added {key}={value} to section {current_section}")
         
         # Store any remaining comments
         if section_comments:
             self.comments['_end'] = section_comments
         
-        logger.info(f"Finished parsing. Found sections: {list(self.sections.keys())}")
         return self.sections
     
     def get_endpoint_sections(self, endpoint_id: str) -> List[str]:
@@ -103,16 +83,16 @@ class AdvancedPJSIPConfigParser:
         if endpoint_id in self.sections:
             related_sections.append(endpoint_id)
         
-        # Auth section - use same ID
-        auth_section = endpoint_id
-        if auth_section in self.sections and self.sections[auth_section].get('type') == 'auth':
+        # Auth section
+        auth_section = f"{endpoint_id}"
+        if auth_section in self.sections:
             related_sections.append(auth_section)
         
-        # AOR section - use same ID
-        aor_section = endpoint_id
-        if aor_section in self.sections and self.sections[aor_section].get('type') == 'aor':
+        # AOR section
+        aor_section = f"{endpoint_id}"
+        if aor_section in self.sections:
             related_sections.append(aor_section)
-        
+            print(f"AOR-AUTH Section: {related_sections}")
         return related_sections
         
     
@@ -131,8 +111,8 @@ class AdvancedPJSIPConfigParser:
             'context': endpoint_data.get('context', 'internal'),
             'disallow': endpoint_data.get('disallow', 'all'),
             'allow': endpoint_data.get('allow', 'ulaw,alaw'),
-            'auth': endpoint_id,  # Use same ID for auth
-            'aors': endpoint_id   # Use same ID for aor
+            'auth': f"{endpoint_id}_auth",
+            'aors': f"{endpoint_id}_aor"
         }
         
         # Add all the advanced PJSIP options
@@ -186,7 +166,7 @@ class AdvancedPJSIPConfigParser:
         self.sections[endpoint_id] = endpoint_section
         
         # Add auth section
-        auth_section = endpoint_id  # Use same ID as endpoint
+        auth_section = f"{endpoint_id}_auth"
         auth_data = endpoint_data.get('auth', {})
         self.sections[auth_section] = {
             'type': auth_data.get('type', 'auth'),
@@ -197,7 +177,7 @@ class AdvancedPJSIPConfigParser:
         }
         
         # Add AOR section
-        aor_section = endpoint_id  # Use same ID as endpoint
+        aor_section = f"{endpoint_id}_aor"
         aor_data = endpoint_data.get('aor', {})
         aor_config = {
             'type': aor_data.get('type', 'aor'),
@@ -227,96 +207,37 @@ class AdvancedPJSIPConfigParser:
     def update_endpoint(self, endpoint_data: Dict[str, Any]) -> bool:
         """Update an existing endpoint"""
         endpoint_id = endpoint_data['id']
-        logger.info(f"Updating endpoint {endpoint_id} with data: {endpoint_data}")
         
         if endpoint_id not in self.sections:
             logger.warning(f"Endpoint {endpoint_id} does not exist")
             return False
         
         # Update endpoint section with provided values
-        endpoint_section = {
-            'type': 'endpoint',
-            'aors': endpoint_id,
-            'accountcode': endpoint_id,
-            'subscribe_context': f't-{endpoint_id}',
-            'moh_suggest': 'default',
-            'notify_early_inuse_ringing': 'yes',
-            'refer_blind_progress': 'yes',
-            'auth': endpoint_id,
-            'outbound_auth': endpoint_id,
-            'direct_media': 'no',
-            'force_rport': 'yes',
-            'rtp_symmetric': 'yes',
-            'rewrite_contact': 'yes',
-            'dtmf_mode': 'rfc4733',
-            'context': 'internal',
-            'allow': 'alaw',
-            'use_ptime': 'no'
-        }
-        
-        # Update with provided values
         for key, value in endpoint_data.items():
             if key not in ['id', 'auth', 'aor'] and value is not None:
-                endpoint_section[key] = str(value)
+                # Always include transport even if it's the default
+                if key == 'transport' or str(value).strip():
+                    self.sections[endpoint_id][key] = str(value)
         
-        # Set callerid if name is provided
-        if 'name' in endpoint_data:
-            endpoint_section['callerid'] = f"{endpoint_data['name']} <{endpoint_id}>"
+        # Update auth section if provided
+        if 'auth' in endpoint_data and endpoint_data['auth']:
+            auth_section = f"{endpoint_id}_auth"
+            if auth_section in self.sections:
+                auth_data = endpoint_data['auth']
+                for key, value in auth_data.items():
+                    if value is not None:
+                        self.sections[auth_section][key] = str(value)
         
-        self.sections[endpoint_id] = endpoint_section
-        logger.info(f"Updated endpoint section {endpoint_id}")
+        # Update AOR section if provided
+        if 'aor' in endpoint_data and endpoint_data['aor']:
+            aor_section = f"{endpoint_id}_aor"
+            if aor_section in self.sections:
+                aor_data = endpoint_data['aor']
+                for key, value in aor_data.items():
+                    if value is not None:
+                        self.sections[aor_section][key] = str(value)
         
-        # Update auth section
-        auth_section = f"{endpoint_id}_auth"
-        
-        # Get password from either auth section or directly from endpoint_data
-        password = None
-        if 'auth' in endpoint_data and isinstance(endpoint_data['auth'], dict):
-            password = endpoint_data['auth'].get('password')
-        elif 'password' in endpoint_data:
-            password = endpoint_data['password']
-            
-        # If no password provided, keep existing password
-        if password is None and auth_section in self.sections:
-            password = self.sections[auth_section].get('password', '')
-            
-        auth_data = {
-            'type': 'auth',
-            'auth_type': 'userpass',
-            'username': endpoint_id,
-            'password': password or '',
-            'realm': 'UVLink'
-        }
-        self.sections[auth_section] = auth_data
-        logger.info(f"Updated auth section {auth_section}")
-        
-        # Update AOR section
-        aor_section = f"{endpoint_id}_aor"
-        aor_data = {
-            'type': 'aor',
-            'max_contacts': '1',
-            'qualify_frequency': '60',
-            'qualify_timeout': '8',
-            'remove_unavailable': 'yes',
-            'remove_existing': 'yes',
-            'default_expiration': '3600',
-            'minimum_expiration': '60',
-            'maximum_expiration': '7200'
-        }
-        self.sections[aor_section] = aor_data
-        logger.info(f"Updated aor section {aor_section}")
-        
-        # Update order to ensure sections are in correct order
-        if endpoint_id in self.order:
-            self.order.remove(endpoint_id)
-        if auth_section in self.order:
-            self.order.remove(auth_section)
-        if aor_section in self.order:
-            self.order.remove(aor_section)
-        
-        self.order.extend([endpoint_id, auth_section, aor_section])
-        
-        logger.info(f"Finished updating endpoint {endpoint_id}")
+        logger.info(f"Updated endpoint {endpoint_id}")
         return True
     
     def delete_endpoint(self, endpoint_id: str) -> bool:
@@ -499,7 +420,7 @@ class AdvancedPJSIPConfigParser:
                 else:
                     new_sections.append(f"callerid=Extension {endpoint_id} <{endpoint_id}>")
             
-            # Add auth section with same ID
+            # Add auth section
             new_sections.append(f"\n[{endpoint_id}]")
             new_sections.append("type=auth")
             new_sections.append("auth_type=userpass")
@@ -516,7 +437,7 @@ class AdvancedPJSIPConfigParser:
             new_sections.append(f"username={username}")
             new_sections.append(f"password={password}")  # Always add password, even if empty
             
-            # Add AOR section with same ID
+            # Add AOR section with all required fields
             new_sections.append(f"\n[{endpoint_id}]")
             new_sections.append("type=aor")
             new_sections.append("max_contacts=1")

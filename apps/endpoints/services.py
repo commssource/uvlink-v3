@@ -316,66 +316,44 @@ class AdvancedEndpointService:
     
     @staticmethod
     def update_endpoint(endpoint_id: str, endpoint_data: EndpointUpdate) -> bool:
-        """Update an existing endpoint with full structure support"""
+        """Update an existing endpoint - requires full parsing"""
         parser = AdvancedEndpointService.get_parser()  # This will parse the entire file
-        
-        # Verify endpoint exists
-        if endpoint_id not in parser.sections:
-            logger.warning(f"Endpoint {endpoint_id} does not exist")
-            return False
-            
-        # Verify ID matches if provided
-        if endpoint_data.id != endpoint_id:
-            logger.warning(f"Endpoint ID mismatch: {endpoint_data.id} != {endpoint_id}")
-            return False
         
         # Build update data
         update_data = {'id': endpoint_id}
         
-        # Add basic identification fields
+        # Add provided fields
         if endpoint_data.name is not None:
             update_data['name'] = endpoint_data.name
-        if endpoint_data.accountcode is not None:
-            update_data['accountcode'] = endpoint_data.accountcode
-            
-        # Add audio media settings
-        if endpoint_data.audio_media is not None:
-            update_data.update(endpoint_data.audio_media.model_dump())
-            
-        # Add transport network settings
-        if endpoint_data.transport_network is not None:
-            update_data.update(endpoint_data.transport_network.model_dump())
-            
-        # Add RTP settings
-        if endpoint_data.rtp is not None:
-            update_data.update(endpoint_data.rtp.model_dump())
-            
-        # Add recording settings
-        if endpoint_data.recording is not None:
-            update_data.update(endpoint_data.recording.model_dump())
-            
-        # Add call settings
-        if endpoint_data.call is not None:
-            update_data.update(endpoint_data.call.model_dump())
-            
-        # Add presence settings
-        if endpoint_data.presence is not None:
-            update_data.update(endpoint_data.presence.model_dump())
-            
-        # Add voicemail settings
-        if endpoint_data.voicemail is not None:
-            update_data.update(endpoint_data.voicemail.model_dump())
-            
-        # Add auth settings
-        if endpoint_data.auth is not None:
-            auth_data = endpoint_data.auth.model_dump()
-            auth_data['id'] = endpoint_id  # Ensure auth section has correct ID
+        if endpoint_data.context is not None:
+            update_data['context'] = endpoint_data.context
+        if endpoint_data.callerid is not None:
+            update_data['callerid'] = endpoint_data.callerid
+        if endpoint_data.allow is not None:
+            update_data['allow'] = endpoint_data.allow
+        if endpoint_data.transport is not None:
+            update_data['transport'] = endpoint_data.transport
+        if endpoint_data.webrtc is not None:
+            update_data['webrtc'] = endpoint_data.webrtc
+        
+        # Handle auth updates
+        if endpoint_data.username or endpoint_data.password or endpoint_data.realm:
+            auth_data = {}
+            if endpoint_data.username:
+                auth_data['username'] = endpoint_data.username
+            if endpoint_data.password:
+                auth_data['password'] = endpoint_data.password
+            if endpoint_data.realm:
+                auth_data['realm'] = endpoint_data.realm
             update_data['auth'] = auth_data
-            
-        # Add AOR settings
-        if endpoint_data.aor is not None:
-            aor_data = endpoint_data.aor.model_dump()
-            aor_data['id'] = endpoint_id  # Ensure AOR section has correct ID
+        
+        # Handle AOR updates
+        if endpoint_data.max_contacts or endpoint_data.qualify_frequency:
+            aor_data = {}
+            if endpoint_data.max_contacts:
+                aor_data['max_contacts'] = endpoint_data.max_contacts
+            if endpoint_data.qualify_frequency:
+                aor_data['qualify_frequency'] = endpoint_data.qualify_frequency
             update_data['aor'] = aor_data
         
         if parser.update_endpoint(update_data):
