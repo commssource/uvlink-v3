@@ -14,7 +14,7 @@ class AdvancedPJSIPConfigParser:
         self.comments = {}
         self.order = []
         
-    def parse(self) -> Dict[str, Dict[str, str]]:
+    def parse(self) -> Dict[Tuple[str, Optional[str]], Dict[str, str]]:
         """Parse PJSIP configuration file while preserving structure"""
         if not Path(self.config_path).exists():
             logger.warning(f"Config file {self.config_path} does not exist")
@@ -36,30 +36,33 @@ class AdvancedPJSIPConfigParser:
                 continue
             
             # Handle section headers [section_name]
-            section_match = re.match(r'^\[([^\]]+)\]', line)
+            section_match = re.match(r'^\[([^\]]+)\](?:\(([^)]+)\))?', line)
             if section_match:
-                current_section = section_match.group(1)
+                section_name = section_match.group(1)
+                section_template = section_match.group(2)  # None if not present
+                section_key = (section_name, section_template)
                 
                 # Handle duplicate section names
-                if current_section in self.sections:
-                    if current_section not in section_counter:
-                        section_counter[current_section] = 1
-                    section_counter[current_section] += 1
-                    current_section = f"{current_section}_{section_counter[current_section]}"
+                if section_name in self.sections:
+                    if section_name not in section_counter:
+                        section_counter[section_name] = 1
+                    section_counter[section_name] += 1
+                    section_name = f"{section_name}_{section_counter[section_name]}"
                 
                 # Store section in order
-                if current_section not in self.order:
-                    self.order.append(current_section)
+                if section_key not in self.order:
+                    self.order.append(section_key)
                 
                 # Initialize section
-                if current_section not in self.sections:
-                    self.sections[current_section] = {}
+                if section_key not in self.sections:
+                    self.sections[section_key] = {}
                 
                 # Store comments for this section
                 if section_comments:
-                    self.comments[current_section] = section_comments
+                    self.comments[section_key] = section_comments
                     section_comments = []
                 
+                current_section = section_key
                 continue
             
             # Handle key=value pairs
@@ -207,36 +210,34 @@ class AdvancedPJSIPConfigParser:
     def update_endpoint(self, endpoint_data: Dict[str, Any]) -> bool:
         """Update an existing endpoint"""
         endpoint_id = endpoint_data['id']
-        
-        if endpoint_id not in self.sections:
+        endpoint_key = (endpoint_id, 'endpoint-tpl')
+        auth_key = (f"{endpoint_id}-auth", None)
+        aor_key = (endpoint_id, 'aor-tpl')
+
+        if endpoint_key not in self.sections:
             logger.warning(f"Endpoint {endpoint_id} does not exist")
             return False
-        
-        # Update endpoint section with provided values
+
+        # Update endpoint section
         for key, value in endpoint_data.items():
             if key not in ['id', 'auth', 'aor'] and value is not None:
-                # Always include transport even if it's the default
                 if key == 'transport' or str(value).strip():
-                    self.sections[endpoint_id][key] = str(value)
-        
-        # Update auth section if provided
+                    self.sections[endpoint_key][key] = str(value)
+
+        # Update auth section
         if 'auth' in endpoint_data and endpoint_data['auth']:
-            auth_section = f"{endpoint_id}-auth"
-            if auth_section in self.sections:
-                auth_data = endpoint_data['auth']
-                for key, value in auth_data.items():
+            if auth_key in self.sections:
+                for key, value in endpoint_data['auth'].items():
                     if value is not None:
-                        self.sections[auth_section][key] = str(value)
-        
-        # Update AOR section if provided
+                        self.sections[auth_key][key] = str(value)
+
+        # Update AOR section
         if 'aor' in endpoint_data and endpoint_data['aor']:
-            aor_section = endpoint_id
-            if aor_section in self.sections:
-                aor_data = endpoint_data['aor']
-                for key, value in aor_data.items():
+            if aor_key in self.sections:
+                for key, value in endpoint_data['aor'].items():
                     if value is not None:
-                        self.sections[aor_section][key] = str(value)
-        
+                        self.sections[aor_key][key] = str(value)
+
         logger.info(f"Updated endpoint {endpoint_id}")
         return True
     
@@ -330,24 +331,23 @@ class AdvancedPJSIPConfigParser:
             content_lines = []
             
             # Add sections in order
-            for section_name in self.order:
-                if section_name not in self.sections:
+            for section_key in self.order:
+                if section_key not in self.sections:
                     continue
                 
                 # Add comments before section
-                if section_name in self.comments:
-                    content_lines.extend(self.comments[section_name])
+                if section_key in self.comments:
+                    content_lines.extend(self.comments[section_key])
                 
                 # Add section header with template if needed
-                if self.sections[section_name].get('type') == 'endpoint':
-                    content_lines.append(f"[{section_name}](endpoint-tpl)")
-                elif self.sections[section_name].get('type') == 'aor':
-                    content_lines.append(f"[{section_name}](aor-tpl)")
+                section_name, section_template = section_key
+                if section_template:
+                    content_lines.append(f"[{section_name}]({section_template})")
                 else:
                     content_lines.append(f"[{section_name}]")
                 
                 # Add section content
-                for key, value in self.sections[section_name].items():
+                for key, value in self.sections[section_key].items():
                     content_lines.append(f"{key}={value}")
                 
                 # Add single newline between sections
@@ -357,10 +357,9 @@ class AdvancedPJSIPConfigParser:
             for section_name, section_data in self.sections.items():
                 if section_name not in self.order:
                     # Add section header with template if needed
-                    if section_data.get('type') == 'endpoint':
-                        content_lines.append(f"[{section_name}](endpoint-tpl)")
-                    elif section_data.get('type') == 'aor':
-                        content_lines.append(f"[{section_name}](aor-tpl)")
+                    section_name, section_template = section_name
+                    if section_template:
+                        content_lines.append(f"[{section_name}]({section_template})")
                     else:
                         content_lines.append(f"[{section_name}]")
                     
