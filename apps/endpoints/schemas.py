@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field, field_validator, validator
 from typing import List, Optional, Dict, Any, Union
 from datetime import datetime
+from shared.models import PasswordField
 import re
 
 class AudioMediaSettings(BaseModel):
@@ -206,7 +207,7 @@ class EndpointUpdate(BaseModel):
     max_contacts: Optional[int] = Field(None, ge=1, le=10)
     qualify_frequency: Optional[int] = Field(None, ge=0, le=300)
     username: Optional[str] = Field(None, min_length=1, max_length=50)
-    password: Optional[str] = Field(None, min_length=8, max_length=128)
+    password: Optional[PasswordField] = None
     realm: Optional[str] = Field(None, max_length=100)
 
 class BulkEndpointCreate(BaseModel):
