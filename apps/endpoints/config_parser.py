@@ -84,12 +84,12 @@ class AdvancedPJSIPConfigParser:
             related_sections.append(endpoint_id)
         
         # Auth section
-        auth_section = f"{endpoint_id}_auth"
+        auth_section = f"{endpoint_id}"
         if auth_section in self.sections:
             related_sections.append(auth_section)
         
         # AOR section
-        aor_section = f"{endpoint_id}_aor"
+        aor_section = f"{endpoint_id}"
         if aor_section in self.sections:
             related_sections.append(aor_section)
         
