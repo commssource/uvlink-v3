@@ -221,7 +221,7 @@ class AdvancedPJSIPConfigParser:
         
         # Update auth section if provided
         if 'auth' in endpoint_data and endpoint_data['auth']:
-            auth_section = f"{endpoint_id}_auth"
+            auth_section = f"{endpoint_id}-auth"
             if auth_section in self.sections:
                 auth_data = endpoint_data['auth']
                 for key, value in auth_data.items():
@@ -230,7 +230,7 @@ class AdvancedPJSIPConfigParser:
         
         # Update AOR section if provided
         if 'aor' in endpoint_data and endpoint_data['aor']:
-            aor_section = f"{endpoint_id}_aor"
+            aor_section = endpoint_id
             if aor_section in self.sections:
                 aor_data = endpoint_data['aor']
                 for key, value in aor_data.items():
@@ -338,21 +338,36 @@ class AdvancedPJSIPConfigParser:
                 if section_name in self.comments:
                     content_lines.extend(self.comments[section_name])
                 
-                # Add section header
-                content_lines.append(f"[{section_name}]")
+                # Add section header with template if needed
+                if self.sections[section_name].get('type') == 'endpoint':
+                    content_lines.append(f"[{section_name}](endpoint-tpl)")
+                elif self.sections[section_name].get('type') == 'aor':
+                    content_lines.append(f"[{section_name}](aor-tpl)")
+                else:
+                    content_lines.append(f"[{section_name}]")
                 
                 # Add section content
                 for key, value in self.sections[section_name].items():
                     content_lines.append(f"{key}={value}")
                 
-                content_lines.append("")  # Empty line after section
+                # Add single newline between sections
+                content_lines.append("")
             
             # Add any remaining sections not in order
             for section_name, section_data in self.sections.items():
                 if section_name not in self.order:
-                    content_lines.append(f"[{section_name}]")
+                    # Add section header with template if needed
+                    if section_data.get('type') == 'endpoint':
+                        content_lines.append(f"[{section_name}](endpoint-tpl)")
+                    elif section_data.get('type') == 'aor':
+                        content_lines.append(f"[{section_name}](aor-tpl)")
+                    else:
+                        content_lines.append(f"[{section_name}]")
+                    
                     for key, value in section_data.items():
                         content_lines.append(f"{key}={value}")
+                    
+                    # Add single newline between sections
                     content_lines.append("")
             
             # Add end comments
