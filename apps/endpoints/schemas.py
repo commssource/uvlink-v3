@@ -215,18 +215,38 @@ class EndpointCreate(BaseModel):
             raise ValueError("Either simple or advanced endpoint data must be provided")
 
 class EndpointUpdate(BaseModel):
-    """Update endpoint configuration"""
+    """Update endpoint configuration with full structure support"""
+    # Basic identification
+    id: str = Field(..., min_length=1, max_length=50, pattern=r'^[a-zA-Z0-9_-]+$')
     name: Optional[str] = Field(None, max_length=100)
-    context: Optional[str] = Field(None, pattern=r'^[a-zA-Z0-9_-]+$')
-    callerid: Optional[str] = Field(None, max_length=100)
-    allow: Optional[str] = Field(None)
-    transport: Optional[str] = Field(None)
-    webrtc: Optional[str] = Field(None, pattern=r'^(yes|no)$')
-    max_contacts: Optional[int] = Field(None, ge=1, le=10)
-    qualify_frequency: Optional[int] = Field(None, ge=0, le=300)
-    username: Optional[str] = Field(None, min_length=1, max_length=50)
-    password: Optional[str] = Field(None, min_length=8, max_length=128)
-    realm: Optional[str] = Field(None, max_length=100)
+    accountcode: Optional[str] = Field(None, max_length=20)
+    
+    # Audio/Media settings
+    audio_media: Optional[AudioMediaSettings] = None
+    
+    # Transport/Network settings
+    transport_network: Optional[TransportNetworkSettings] = None
+    
+    # RTP settings
+    rtp: Optional[RTPSettings] = None
+    
+    # Recording settings
+    recording: Optional[RecordingSettings] = None
+    
+    # Call settings
+    call: Optional[CallSettings] = None
+    
+    # Presence settings
+    presence: Optional[PresenceSettings] = None
+    
+    # Voicemail settings
+    voicemail: Optional[VoicemailSettings] = None
+    
+    # Authentication
+    auth: Optional[AuthConfig] = None
+    
+    # AOR settings
+    aor: Optional[AORConfig] = None
 
 class BulkEndpointCreate(BaseModel):
     """Create multiple endpoints at once"""
