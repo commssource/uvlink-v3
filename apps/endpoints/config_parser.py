@@ -40,16 +40,12 @@ class AdvancedPJSIPConfigParser:
             if section_match:
                 current_section = section_match.group(1)
                 
-                # Handle duplicate section names by checking type
+                # Handle duplicate section names
                 if current_section in self.sections:
-                    # Get the type of the existing section
-                    existing_type = self.sections[current_section].get('type')
-                    # If it's an endpoint section, create new sections for auth and aor
-                    if existing_type == 'endpoint':
-                        if current_section not in section_counter:
-                            section_counter[current_section] = 1
-                        section_counter[current_section] += 1
-                        current_section = f"{current_section}_{section_counter[current_section]}"
+                    if current_section not in section_counter:
+                        section_counter[current_section] = 1
+                    section_counter[current_section] += 1
+                    current_section = f"{current_section}_{section_counter[current_section]}"
                 
                 # Store section in order
                 if current_section not in self.order:
@@ -223,14 +219,8 @@ class AdvancedPJSIPConfigParser:
         
         # Update auth section if provided
         if 'auth' in endpoint_data and endpoint_data['auth']:
-            # Find the auth section by checking all sections with the same base ID
-            auth_section = None
-            for section_name in self.sections:
-                if section_name.startswith(endpoint_id) and self.sections[section_name].get('type') == 'auth':
-                    auth_section = section_name
-                    break
-            
-            if auth_section:
+            auth_section = f"{endpoint_id}_auth"
+            if auth_section in self.sections:
                 auth_data = endpoint_data['auth']
                 for key, value in auth_data.items():
                     if value is not None:
@@ -238,14 +228,8 @@ class AdvancedPJSIPConfigParser:
         
         # Update AOR section if provided
         if 'aor' in endpoint_data and endpoint_data['aor']:
-            # Find the aor section by checking all sections with the same base ID
-            aor_section = None
-            for section_name in self.sections:
-                if section_name.startswith(endpoint_id) and self.sections[section_name].get('type') == 'aor':
-                    aor_section = section_name
-                    break
-            
-            if aor_section:
+            aor_section = f"{endpoint_id}_aor"
+            if aor_section in self.sections:
                 aor_data = endpoint_data['aor']
                 for key, value in aor_data.items():
                     if value is not None:
