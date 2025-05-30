@@ -2,61 +2,30 @@ endpoint:
   type: endpoint
   aors: ""
   auth: ""
-  context: internal
-  disallow: all
-  allow: ulaw,alaw
-  accountcode: ""
-  max_audio_streams: 2
-  device_state_busy_at: 2
-  allow_transfer: yes
   outbound_auth: ""
-  callerid: ""
-  callerid_privacy: ""
-  connected_line_method: invite
-  transport: transport-udp
-  identify_by: username
-  deny: ""
-  permit: ""
-  force_rport: yes
-  webrtc: no
+  context: internal
+  accountcode: ""
+  subscribe_context: internal
   moh_suggest: default
-  call_group: 1
-  rtp_symmetric: yes
-  rtp_timeout: 30
-  rtp_timeout_hold: 60
-  rewrite_contact: yes
-  from_user: ""
-  from_domain: ""
-  mailboxes: ""
-  voicemail_extension: ""
-  pickup_group: 1
-  one_touch_recording: yes
-  record_on_feature: "*1"
-  record_off_feature: "*2"
-  record_calls: yes
-  allow_subscribe: yes
-  dtmf_mode: rfc4733
-  100rel: no
+  notify_early_inuse_ringing: yes
+  refer_blind_progress: yes
   direct_media: no
-  ice_support: no
-  sdp_session: Asterisk
-  set_var: ""
-  tone_zone: us
-  send_pai: yes
-  send_rpid: yes
+  force_rport: yes
+  rtp_symmetric: yes
+  rewrite_contact: yes
+  dtmf_mode: rfc4733
+  allow: alaw
+  use_ptime: no
+  callerid: ""
 
 auth:
   type: auth
   auth_type: userpass
   username: ""
   password: ""
-  realm: UVLink
 
 aor:
   type: aor
-  max_contacts: 2
+  max_contacts: 1
+  qualify_timeout: 8
   qualify_frequency: 60
-  # authenticate_qualify: no
-  # default_expiration: 3600
-  # minimum_expiration: 60
-  # maximum_expiration: 7200
