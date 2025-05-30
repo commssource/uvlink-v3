@@ -2,6 +2,8 @@ import re
 import logging
 from typing import Dict, List, Tuple, Optional, Any
 from pathlib import Path
+import yaml
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -13,6 +15,13 @@ class AdvancedPJSIPConfigParser:
         self.sections = {}
         self.comments = {}
         self.order = []
+        # Load options from YAML
+        options_path = os.path.join(os.path.dirname(__file__), "pjsip_options.yaml")
+        with open(options_path, "r") as f:
+            self.options = yaml.safe_load(f)
+        self.endpoint_options = self.options.get("endpoint", {})
+        self.auth_options = self.options.get("auth", {})
+        self.aor_options = self.options.get("aor", {})
         
     def parse(self) -> Dict[Tuple[str, Optional[str]], Dict[str, str]]:
         """Parse PJSIP configuration file while preserving structure"""
@@ -109,105 +118,41 @@ class AdvancedPJSIPConfigParser:
         endpoint_id = endpoint_data['id']
         
         # Check if endpoint already exists
-        if endpoint_id in self.sections:
+        endpoint_key = (endpoint_id, 'endpoint-tpl')
+        if endpoint_key in self.sections:
             logger.warning(f"Endpoint {endpoint_id} already exists")
             return False
         
-        # Add endpoint section with all advanced options
-        endpoint_section = {
-            'type': endpoint_data.get('type', 'endpoint'),
-            'context': endpoint_data.get('context', 'internal'),
-            'disallow': endpoint_data.get('disallow', 'all'),
-            'allow': endpoint_data.get('allow', 'ulaw,alaw'),
-            'auth': f"{endpoint_id}_auth",
-            'aors': f"{endpoint_id}_aor"
-        }
-        
-        # Add all the advanced PJSIP options
-        advanced_options = {
-            'accountcode': endpoint_data.get('accountcode'),
-            'max_audio_streams': endpoint_data.get('max_audio_streams', '2'),
-            'device_state_busy_at': endpoint_data.get('device_state_busy_at', '2'),
-            'allow_transfer': endpoint_data.get('allow_transfer', 'yes'),
-            'outbound_auth': endpoint_data.get('outbound_auth', ''),
-            'callerid': endpoint_data.get('callerid', ''),
-            'callerid_privacy': endpoint_data.get('callerid_privacy', ''),
-            'connected_line_method': endpoint_data.get('connected_line_method', 'invite'),
-            'transport': endpoint_data.get('transport', 'transport-udp'),
-            'identify_by': endpoint_data.get('identify_by', 'username'),
-            'deny': endpoint_data.get('deny', ''),
-            'permit': endpoint_data.get('permit', ''),
-            'force_rport': endpoint_data.get('force_rport', 'yes'),
-            'webrtc': endpoint_data.get('webrtc', 'no'),
-            'moh_suggest': endpoint_data.get('moh_suggest', 'default'),
-            'call_group': endpoint_data.get('call_group', '1'),
-            'rtp_symmetric': endpoint_data.get('rtp_symmetric', 'yes'),
-            'rtp_timeout': endpoint_data.get('rtp_timeout', '30'),
-            'rtp_timeout_hold': endpoint_data.get('rtp_timeout_hold', '60'),
-            'rewrite_contact': endpoint_data.get('rewrite_contact', 'yes'),
-            'from_user': endpoint_data.get('from_user', endpoint_id),
-            'from_domain': endpoint_data.get('from_domain', ''),
-            'mailboxes': endpoint_data.get('mailboxes', ''),
-            'voicemail_extension': endpoint_data.get('voicemail_extension', ''),
-            'pickup_group': endpoint_data.get('pickup_group', '1'),
-            'one_touch_recording': endpoint_data.get('one_touch_recording', 'yes'),
-            'record_on_feature': endpoint_data.get('record_on_feature', '*1'),
-            'record_off_feature': endpoint_data.get('record_off_feature', '*2'),
-            'record_calls': endpoint_data.get('record_calls', 'yes'),
-            'allow_subscribe': endpoint_data.get('allow_subscribe', 'yes'),
-            'dtmf_mode': endpoint_data.get('dtmf_mode', 'rfc4733'),
-            '100rel': endpoint_data.get('100rel', 'no'),
-            'direct_media': endpoint_data.get('direct_media', 'no'),
-            'ice_support': endpoint_data.get('ice_support', 'no'),
-            'sdp_session': endpoint_data.get('sdp_session', 'Asterisk'),
-            'set_var': endpoint_data.get('set_var', ''),
-            'tone_zone': endpoint_data.get('tone_zone', 'us'),
-            'send_pai': endpoint_data.get('send_pai', 'yes'),
-            'send_rpid': endpoint_data.get('send_rpid', 'yes')
-        }
-        
-        # Only add non-empty values
-        for key, value in advanced_options.items():
-            if value is not None and str(value).strip():
+        # Build endpoint section from YAML options
+        endpoint_section = {}
+        for key, default in self.endpoint_options.items():
+            value = endpoint_data.get(key, default)
+            if value != "" and value is not None:
                 endpoint_section[key] = str(value)
+        self.sections[endpoint_key] = endpoint_section
         
-        self.sections[endpoint_id] = endpoint_section
-        
-        # Add auth section
-        auth_section = f"{endpoint_id}_auth"
+        # Build auth section from YAML options
+        auth_key = (f"{endpoint_id}-auth", None)
         auth_data = endpoint_data.get('auth', {})
-        self.sections[auth_section] = {
-            'type': auth_data.get('type', 'auth'),
-            'auth_type': auth_data.get('auth_type', 'userpass'),
-            'username': auth_data.get('username', endpoint_id),
-            'password': auth_data.get('password', ''),
-            'realm': auth_data.get('realm', 'UVLink')
-        }
+        auth_section = {}
+        for key, default in self.auth_options.items():
+            value = auth_data.get(key, default)
+            if value != "" and value is not None:
+                auth_section[key] = str(value)
+        self.sections[auth_key] = auth_section
         
-        # Add AOR section
-        aor_section = f"{endpoint_id}_aor"
+        # Build aor section from YAML options
+        aor_key = (endpoint_id, 'aor-tpl')
         aor_data = endpoint_data.get('aor', {})
-        aor_config = {
-            'type': aor_data.get('type', 'aor'),
-            'max_contacts': str(aor_data.get('max_contacts', 2))
-        }
-        
-        # Add optional AOR settings
-        if aor_data.get('qualify_frequency'):
-            aor_config['qualify_frequency'] = str(aor_data['qualify_frequency'])
-        if aor_data.get('authenticate_qualify'):
-            aor_config['authenticate_qualify'] = str(aor_data['authenticate_qualify'])
-        if aor_data.get('default_expiration'):
-            aor_config['default_expiration'] = str(aor_data['default_expiration'])
-        if aor_data.get('minimum_expiration'):
-            aor_config['minimum_expiration'] = str(aor_data['minimum_expiration'])
-        if aor_data.get('maximum_expiration'):
-            aor_config['maximum_expiration'] = str(aor_data['maximum_expiration'])
-        
-        self.sections[aor_section] = aor_config
+        aor_section = {}
+        for key, default in self.aor_options.items():
+            value = aor_data.get(key, default)
+            if value != "" and value is not None:
+                aor_section[key] = str(value)
+        self.sections[aor_key] = aor_section
         
         # Add to order
-        self.order.extend([endpoint_id, auth_section, aor_section])
+        self.order.extend([endpoint_key, auth_key, aor_key])
         
         logger.info(f"Added advanced endpoint {endpoint_id}")
         return True
@@ -224,24 +169,21 @@ class AdvancedPJSIPConfigParser:
             return False
 
         # Update endpoint section
-        for key, value in endpoint_data.items():
-            if key not in ['id', 'auth', 'aor'] and value is not None:
-                if key == 'transport' or str(value).strip():
-                    self.sections[endpoint_key][key] = str(value)
+        for key in self.endpoint_options:
+            if key in endpoint_data and endpoint_data[key] is not None:
+                self.sections[endpoint_key][key] = str(endpoint_data[key])
 
         # Update auth section
         if 'auth' in endpoint_data and endpoint_data['auth']:
-            if auth_key in self.sections:
-                for key, value in endpoint_data['auth'].items():
-                    if value is not None:
-                        self.sections[auth_key][key] = str(value)
+            for key in self.auth_options:
+                if key in endpoint_data['auth'] and endpoint_data['auth'][key] is not None:
+                    self.sections[auth_key][key] = str(endpoint_data['auth'][key])
 
-        # Update AOR section
+        # Update aor section
         if 'aor' in endpoint_data and endpoint_data['aor']:
-            if aor_key in self.sections:
-                for key, value in endpoint_data['aor'].items():
-                    if value is not None:
-                        self.sections[aor_key][key] = str(value)
+            for key in self.aor_options:
+                if key in endpoint_data['aor'] and endpoint_data['aor'][key] is not None:
+                    self.sections[aor_key][key] = str(endpoint_data['aor'][key])
 
         logger.info(f"Updated endpoint {endpoint_id}")
         return True
@@ -291,29 +233,23 @@ class AdvancedPJSIPConfigParser:
             aor_data = aor_sections.get(section_name, {})
             
             # Build complete endpoint info
-            endpoint_info = {
-                'id': section_name,
-                'type': section_data.get('type', 'endpoint'),
-                'context': section_data.get('context', 'internal'),
-                'allow': section_data.get('allow', 'ulaw,alaw'),
-                'disallow': section_data.get('disallow', 'all'),
-                'transport': section_data.get('transport', 'transport-udp'),
-                'callerid': section_data.get('callerid', ''),
-                'webrtc': section_data.get('webrtc', 'no'),
-                'auth': {
-                    'type': auth_data.get('type', 'auth'),
-                    'auth_type': auth_data.get('auth_type', 'userpass'),
-                    'username': auth_data.get('username', section_name),
-                    'password': auth_data.get('password', ''),
-                    'realm': auth_data.get('realm', 'UVLink')
-                },
-                'aor': {
-                    'type': aor_data.get('type', 'aor'),
-                    'max_contacts': int(aor_data.get('max_contacts', 2)),
-                    'qualify_frequency': int(aor_data.get('qualify_frequency', 60)) if aor_data.get('qualify_frequency') else 60,
-                    'remove_unavailable': aor_data.get('remove_unavailable', 'no')
-                }
-            }
+            endpoint_info = {'id': section_name}
+            
+            # Add endpoint options
+            for key in self.endpoint_options:
+                endpoint_info[key] = section_data.get(key, self.endpoint_options[key])
+            
+            # Add auth options
+            auth_info = {}
+            for key in self.auth_options:
+                auth_info[key] = auth_data.get(key, self.auth_options[key])
+            endpoint_info['auth'] = auth_info
+            
+            # Add aor options
+            aor_info = {}
+            for key in self.aor_options:
+                aor_info[key] = aor_data.get(key, self.aor_options[key])
+            endpoint_info['aor'] = aor_info
             
             # Add all other endpoint properties
             for key, value in section_data.items():
@@ -409,59 +345,29 @@ class AdvancedPJSIPConfigParser:
             # Prepare new sections
             new_sections = []
             
-            # Add endpoint section with exact configuration
+            # Add endpoint section with options from YAML
             new_sections.append(f"[{endpoint_id}](endpoint-tpl)")
-            new_sections.append("type=endpoint")
-            new_sections.append(f"aors={endpoint_id}")
-            new_sections.append(f"accountcode={endpoint_id}")
-            new_sections.append(f"subscribe_context=t-{endpoint_id}")
-            new_sections.append("moh_suggest=default")
-            new_sections.append("notify_early_inuse_ringing=yes")
-            new_sections.append("refer_blind_progress=yes")
-            new_sections.append(f"auth={endpoint_id}-auth")
-            new_sections.append(f"outbound_auth={endpoint_id}-auth")
-            new_sections.append("direct_media=no")
-            new_sections.append("force_rport=yes")
-            new_sections.append("rtp_symmetric=yes")
-            new_sections.append("rewrite_contact=yes")
-            new_sections.append("dtmf_mode=rfc4733")
-            new_sections.append("context=t-internal")
-            new_sections.append("allow=alaw")
-            new_sections.append("use_ptime=no")
+            for key, default in self.endpoint_options.items():
+                value = endpoint_data.get(key, default)
+                if value != "" and value is not None:
+                    new_sections.append(f"{key}={value}")
+            new_sections.append("")  # blank line after section
             
-            # Add callerid
-            new_sections.append(f"callerid={endpoint_id} <{endpoint_id}>")
-            new_sections.append("")  # <-- Add blank line after endpoint section
-            
-            # Add auth section
+            # Add auth section with options from YAML
             new_sections.append(f"[{endpoint_id}-auth]")
-            new_sections.append("type=auth")
+            for key, default in self.auth_options.items():
+                value = endpoint_data.get('auth', {}).get(key, default)
+                if value != "" and value is not None:
+                    new_sections.append(f"{key}={value}")
+            new_sections.append("")
             
-            # Get auth data from either auth section or endpoint_settings
-            auth_data = endpoint_data.get('auth', {})
-            if not auth_data and 'endpoint_settings' in endpoint_data:
-                auth_data = endpoint_data['endpoint_settings']
-            
-            # Always add username and password
-            username = auth_data.get('username', endpoint_id)
-            password = auth_data.get('password', '')
-            
-            new_sections.append(f"username={username}")
-            new_sections.append(f"password={password}")  # Always add password, even if empty
-            new_sections.append("")  # <-- Add blank line after auth section
-            
-            # Add AOR section with all required fields
+            # Add AOR section with options from YAML
             new_sections.append(f"[{endpoint_id}](aor-tpl)")
-            new_sections.append("type=aor")
-            new_sections.append("max_contacts=1")
-            new_sections.append("qualify_frequency=60")
-            new_sections.append("qualify_timeout=8")
-            new_sections.append("remove_unavailable=yes")
-            new_sections.append("remove_existing=yes")
-            new_sections.append("default_expiration=3600")
-            new_sections.append("minimum_expiration=60")
-            new_sections.append("maximum_expiration=7200")
-            new_sections.append("")  # <-- Add blank line after aor section
+            for key, default in self.aor_options.items():
+                value = endpoint_data.get('aor', {}).get(key, default)
+                if value != "" and value is not None:
+                    new_sections.append(f"{key}={value}")
+            new_sections.append("")
             
             # Log final configuration
             logger.info("Final configuration:")
