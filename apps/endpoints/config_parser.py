@@ -219,7 +219,7 @@ class AdvancedPJSIPConfigParser:
         
         # Update auth section if provided
         if 'auth' in endpoint_data and endpoint_data['auth']:
-            auth_section = f"{endpoint_id}_auth"
+            auth_section = endpoint_id  # Use same ID as endpoint for auth section
             if auth_section in self.sections:
                 auth_data = endpoint_data['auth']
                 for key, value in auth_data.items():
@@ -228,7 +228,7 @@ class AdvancedPJSIPConfigParser:
         
         # Update AOR section if provided
         if 'aor' in endpoint_data and endpoint_data['aor']:
-            aor_section = f"{endpoint_id}_aor"
+            aor_section = endpoint_id  # Use same ID as endpoint for aor section
             if aor_section in self.sections:
                 aor_data = endpoint_data['aor']
                 for key, value in aor_data.items():
