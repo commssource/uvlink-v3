@@ -88,7 +88,6 @@ class AuthConfig(BaseModel):
     """Authentication configuration"""
     type: str = Field(default="auth")
     auth_type: str = Field(default="userpass")
-    entity_type: str = Field(default="endpoint")
     username: str = Field(..., min_length=1, max_length=50)
     password: str = Field(..., min_length=1, max_length=128)
     realm: Optional[str] = Field(None, max_length=100)
@@ -96,7 +95,6 @@ class AuthConfig(BaseModel):
 class AORConfig(BaseModel):
     """Address of Record configuration"""
     type: str = Field(default="aor")
-    entity_type: str = Field(default="endpoint")
     max_contacts: int = Field(default=2, ge=1, le=10)
     qualify_frequency: Optional[int] = Field(default=60, ge=0, le=300)
     authenticate_qualify: Optional[str] = Field(default="no")
@@ -106,15 +104,9 @@ class AORConfig(BaseModel):
 
 class AdvancedEndpoint(BaseModel):
     """Advanced PJSIP Endpoint with all configuration options organized by category"""
-    
-    # Basic identification
     id: str = Field(..., min_length=1, max_length=50, pattern=r'^[a-zA-Z0-9_-]+$')
     type: str = Field(default="endpoint")
-    entity_type: str = Field(default="endpoint")
-    name: Optional[str] = Field(None, max_length=100, description="Display name for endpoint")
     accountcode: Optional[str] = Field(None, max_length=20)
-    
-    # Organized settings
     audio_media: AudioMediaSettings = Field(default_factory=AudioMediaSettings)
     transport_network: TransportNetworkSettings = Field(default_factory=TransportNetworkSettings)
     rtp: RTPSettings = Field(default_factory=RTPSettings)
@@ -122,12 +114,8 @@ class AdvancedEndpoint(BaseModel):
     call: CallSettings = Field(default_factory=CallSettings)
     presence: PresenceSettings = Field(default_factory=PresenceSettings)
     voicemail: VoicemailSettings = Field(default_factory=VoicemailSettings)
-    
-    # Authentication and AOR
     auth: AuthConfig
     aor: AORConfig
-    
-    # Timestamps
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
 
@@ -140,18 +128,13 @@ class AdvancedEndpoint(BaseModel):
         flat_dict = {
             'id': self.id,
             'type': self.type,
-            'entity_type': self.entity_type,
-            'name': self.name,
             'accountcode': self.accountcode,
             'auth': self.auth.model_dump(),
             'aor': self.aor.model_dump()
         }
-        
-        # Flatten all settings
         for section in [self.audio_media, self.transport_network, self.rtp, 
-                       self.recording, self.call, self.presence, self.voicemail]:
+                        self.recording, self.call, self.presence, self.voicemail]:
             flat_dict.update(section.model_dump())
-        
         return flat_dict
 
 class SimpleEndpoint(BaseModel):
@@ -163,7 +146,6 @@ class SimpleEndpoint(BaseModel):
     codecs: List[str] = ["ulaw", "alaw"]
     max_contacts: int = 1
     callerid: Optional[str] = None
-    name: Optional[str] = None
     custom_data: Optional[Dict[str, Any]] = None
     auth: Optional[AuthConfig] = None
     aor: Optional[AORConfig] = None
@@ -216,7 +198,6 @@ class EndpointCreate(BaseModel):
 
 class EndpointUpdate(BaseModel):
     """Update endpoint configuration"""
-    name: Optional[str] = Field(None, max_length=100)
     context: Optional[str] = Field(None, pattern=r'^[a-zA-Z0-9_-]+$')
     callerid: Optional[str] = Field(None, max_length=100)
     allow: Optional[str] = Field(None)

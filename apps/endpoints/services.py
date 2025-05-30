@@ -32,7 +32,6 @@ class AdvancedEndpointService:
         # Get auth section data by checking section type
         auth_data = {}
         for section_name, section_data in parser.sections.items():
-            # Check if this section has type=auth
             if section_data.get('type') == 'auth':
                 auth_data = section_data
                 break
@@ -40,7 +39,6 @@ class AdvancedEndpointService:
         return {
             'id': endpoint['id'],
             'type': endpoint['type'],
-            'name': endpoint.get('name', f"Extension {endpoint['id']}"),
             'accountcode': endpoint.get('accountcode'),
             
             'audio_media': {
@@ -107,7 +105,7 @@ class AdvancedEndpointService:
                 'type': 'auth',
                 'auth_type': 'userpass',
                 'username': auth_data.get('username', endpoint['id']),
-                'password': auth_data.get('password', ''),  # Get password from auth section
+                'password': auth_data.get('password', ''),
                 'realm': auth_data.get('realm', 'UVLink')
             },
             
@@ -143,18 +141,13 @@ class AdvancedEndpointService:
     def add_endpoint_from_json(endpoint_data: Dict[str, Any]) -> bool:
         """Add endpoint from JSON data"""
         try:
-            # Get parser instance
             parser = AdvancedEndpointService.get_parser()
-            
-            # Prepare endpoint data
             endpoint_id = endpoint_data['id']
             logger.info(f"Processing endpoint {endpoint_id} with data: {endpoint_data}")
             
-            # Create flat data structure
             flat_data = {
                 'id': endpoint_id,
                 'type': 'endpoint',
-                'name': endpoint_data.get('name', f'Extension {endpoint_id}'),
                 'context': endpoint_data.get('context', 'internal'),
                 'allow': endpoint_data.get('allow', 'ulaw,alaw'),
                 'callerid': endpoint_data.get('callerid', ''),

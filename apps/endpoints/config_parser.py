@@ -288,8 +288,6 @@ class AdvancedPJSIPConfigParser:
             endpoint_info = {
                 'id': section_name,
                 'type': section_data.get('type', 'endpoint'),
-                'entity_type': 'endpoint',
-                'name': section_data.get('name', f'Extension {section_name}'),
                 'context': section_data.get('context', 'internal'),
                 'allow': section_data.get('allow', 'ulaw,alaw'),
                 'disallow': section_data.get('disallow', 'all'),
@@ -393,7 +391,7 @@ class AdvancedPJSIPConfigParser:
             new_sections = []
             
             # Add endpoint section with exact configuration
-            new_sections.append(f"[{endpoint_id}]")
+            new_sections.append(f"[{endpoint_id}](endpoint-tpl)")
             new_sections.append("type=endpoint")
             new_sections.append(f"aors={endpoint_id}")
             new_sections.append(f"accountcode={endpoint_id}")
@@ -401,8 +399,8 @@ class AdvancedPJSIPConfigParser:
             new_sections.append("moh_suggest=default")
             new_sections.append("notify_early_inuse_ringing=yes")
             new_sections.append("refer_blind_progress=yes")
-            new_sections.append(f"auth={endpoint_id}")
-            new_sections.append(f"outbound_auth={endpoint_id}")
+            new_sections.append(f"auth={endpoint_id}-auth")
+            new_sections.append(f"outbound_auth={endpoint_id}-auth")
             new_sections.append("direct_media=no")
             new_sections.append("force_rport=yes")
             new_sections.append("rtp_symmetric=yes")
@@ -412,16 +410,11 @@ class AdvancedPJSIPConfigParser:
             new_sections.append("allow=alaw")
             new_sections.append("use_ptime=no")
             
-            # Add callerid if provided in custom_data
-            if 'custom_data' in endpoint_data and endpoint_data['custom_data']:
-                name = endpoint_data['custom_data'].get('name')
-                if name:
-                    new_sections.append(f"callerid={name} <{endpoint_id}>")
-                else:
-                    new_sections.append(f"callerid=Extension {endpoint_id} <{endpoint_id}>")
+            # Add callerid
+            new_sections.append(f"callerid={endpoint_id} <{endpoint_id}>")
             
             # Add auth section
-            new_sections.append(f"\n[{endpoint_id}]")
+            new_sections.append(f"\n[{endpoint_id}-auth]")
             new_sections.append("type=auth")
             new_sections.append("auth_type=userpass")
             
@@ -438,7 +431,7 @@ class AdvancedPJSIPConfigParser:
             new_sections.append(f"password={password}")  # Always add password, even if empty
             
             # Add AOR section with all required fields
-            new_sections.append(f"\n[{endpoint_id}]")
+            new_sections.append(f"\n[{endpoint_id}](aor-tpl)")
             new_sections.append("type=aor")
             new_sections.append("max_contacts=1")
             new_sections.append("qualify_frequency=60")
