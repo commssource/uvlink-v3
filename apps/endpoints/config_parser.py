@@ -268,11 +268,23 @@ class AdvancedPJSIPConfigParser:
         
         # Update auth section
         auth_section = f"{endpoint_id}_auth"
+        
+        # Get password from either auth section or directly from endpoint_data
+        password = None
+        if 'auth' in endpoint_data and isinstance(endpoint_data['auth'], dict):
+            password = endpoint_data['auth'].get('password')
+        elif 'password' in endpoint_data:
+            password = endpoint_data['password']
+            
+        # If no password provided, keep existing password
+        if password is None and auth_section in self.sections:
+            password = self.sections[auth_section].get('password', '')
+            
         auth_data = {
             'type': 'auth',
             'auth_type': 'userpass',
             'username': endpoint_id,
-            'password': endpoint_data.get('auth', {}).get('password', ''),
+            'password': password or '',
             'realm': 'UVLink'
         }
         self.sections[auth_section] = auth_data
