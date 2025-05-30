@@ -375,7 +375,7 @@ class AdvancedPJSIPConfigParser:
             
             # Write to file
             with open(self.config_path, 'w') as f:
-                f.write('\n'.join(content_lines)+ '\n')
+                f.write('\n'.join(content_lines))
             
             logger.info(f"Configuration saved to {self.config_path}")
             return True
@@ -426,11 +426,11 @@ class AdvancedPJSIPConfigParser:
             
             # Add callerid
             new_sections.append(f"callerid={endpoint_id} <{endpoint_id}>")
+            new_sections.append("--------------------------------")  # <-- Add blank line after endpoint section
             
             # Add auth section
-            new_sections.append(f"\n[{endpoint_id}-auth]")
+            new_sections.append(f"[{endpoint_id}-auth]")
             new_sections.append("type=auth")
-            new_sections.append("auth_type=userpass")
             
             # Get auth data from either auth section or endpoint_settings
             auth_data = endpoint_data.get('auth', {})
@@ -443,9 +443,10 @@ class AdvancedPJSIPConfigParser:
             
             new_sections.append(f"username={username}")
             new_sections.append(f"password={password}")  # Always add password, even if empty
+            new_sections.append("--------------------------------")  # <-- Add blank line after auth section
             
             # Add AOR section with all required fields
-            new_sections.append(f"\n[{endpoint_id}](aor-tpl)")
+            new_sections.append(f"[{endpoint_id}](aor-tpl)")
             new_sections.append("type=aor")
             new_sections.append("max_contacts=1")
             new_sections.append("qualify_frequency=60")
@@ -455,6 +456,7 @@ class AdvancedPJSIPConfigParser:
             new_sections.append("default_expiration=3600")
             new_sections.append("minimum_expiration=60")
             new_sections.append("maximum_expiration=7200")
+            new_sections.append("--------------------------------")  # <-- Add blank line after aor section
             
             # Log final configuration
             logger.info("Final configuration:")
