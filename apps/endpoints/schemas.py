@@ -207,7 +207,7 @@ class EndpointUpdate(BaseModel):
     max_contacts: Optional[int] = Field(None, ge=1, le=10)
     qualify_frequency: Optional[int] = Field(None, ge=0, le=300)
     username: Optional[str] = Field(None, min_length=1, max_length=50)
-    password: Optional[PasswordField] = None
+    password: Optional[str] = PasswordField(None, min_length=8, max_length=128)
     realm: Optional[str] = Field(None, max_length=100)
 
 class BulkEndpointCreate(BaseModel):
