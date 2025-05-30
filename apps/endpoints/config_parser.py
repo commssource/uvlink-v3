@@ -177,7 +177,12 @@ class AdvancedPJSIPConfigParser:
         # Update endpoint section
         for key in self.endpoint_options:
             if key in endpoint_data and endpoint_data[key] is not None:
-                self.sections[endpoint_key][key] = str(endpoint_data[key])
+                if key == "aors":
+                    self.sections[endpoint_key][key] = str(endpoint_data.get("aors", endpoint_id))
+                elif key == "auth" or key == "outbound_auth":
+                    self.sections[endpoint_key][key] = f"{endpoint_id}-auth"
+                else:
+                    self.sections[endpoint_key][key] = str(endpoint_data[key])
 
         # Update auth section
         if 'auth' in endpoint_data and endpoint_data['auth']:
