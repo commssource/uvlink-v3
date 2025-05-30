@@ -35,9 +35,12 @@ class AdvancedEndpointService:
         # Organize endpoints into sections
         organized_endpoints = []
         for endpoint in endpoints:
-            # Get auth section data
-            auth_section = f"{endpoint['id']}"
-            auth_data = parser.sections.get(auth_section, {})
+            # Get auth section data by checking section type
+            auth_data = {}
+            for section_name, section_data in parser.sections.items():
+                if section_name == endpoint['id'] and section_data.get('type') == 'auth':
+                    auth_data = section_data
+                    break
             
             organized = {
                 'id': endpoint['id'],
