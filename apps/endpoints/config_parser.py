@@ -126,7 +126,13 @@ class AdvancedPJSIPConfigParser:
         # Build endpoint section from YAML options
         endpoint_section = {}
         for key, default in self.endpoint_options.items():
-            value = endpoint_data.get(key, default)
+            # Special handling for aors, auth, outbound_auth
+            if key == "aors":
+                value = endpoint_data.get("aors", endpoint_id)
+            elif key == "auth" or key == "outbound_auth":
+                value = endpoint_data.get(key, f"{endpoint_id}-auth")
+            else:
+                value = endpoint_data.get(key, default)
             if value != "" and value is not None:
                 endpoint_section[key] = str(value)
         self.sections[endpoint_key] = endpoint_section
@@ -348,7 +354,13 @@ class AdvancedPJSIPConfigParser:
             # Add endpoint section with options from YAML
             new_sections.append(f"[{endpoint_id}](endpoint-tpl)")
             for key, default in self.endpoint_options.items():
-                value = endpoint_data.get(key, default)
+                # Special handling for aors, auth, outbound_auth
+                if key == "aors":
+                    value = endpoint_data.get("aors", endpoint_id)
+                elif key == "auth" or key == "outbound_auth":
+                    value = endpoint_data.get(key, f"{endpoint_id}-auth")
+                else:
+                    value = endpoint_data.get(key, default)
                 if value != "" and value is not None:
                     new_sections.append(f"{key}={value}")
             new_sections.append("")  # blank line after section

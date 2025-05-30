@@ -1,5 +1,7 @@
 endpoint:
   type: endpoint
+  aors: ""
+  auth: ""
   context: internal
   disallow: all
   allow: ulaw,alaw
@@ -54,7 +56,7 @@ aor:
   type: aor
   max_contacts: 2
   qualify_frequency: 60
-  authenticate_qualify: no
-  default_expiration: 3600
-  minimum_expiration: 60
-  maximum_expiration: 7200
+  # authenticate_qualify: no
+  # default_expiration: 3600
+  # minimum_expiration: 60
+  # maximum_expiration: 7200
