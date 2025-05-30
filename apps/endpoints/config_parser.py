@@ -426,7 +426,7 @@ class AdvancedPJSIPConfigParser:
             
             # Add callerid
             new_sections.append(f"callerid={endpoint_id} <{endpoint_id}>")
-            new_sections.append("--------------------------------")  # <-- Add blank line after endpoint section
+            new_sections.append("")  # <-- Add blank line after endpoint section
             
             # Add auth section
             new_sections.append(f"[{endpoint_id}-auth]")
@@ -443,7 +443,7 @@ class AdvancedPJSIPConfigParser:
             
             new_sections.append(f"username={username}")
             new_sections.append(f"password={password}")  # Always add password, even if empty
-            new_sections.append("--------------------------------")  # <-- Add blank line after auth section
+            new_sections.append("")  # <-- Add blank line after auth section
             
             # Add AOR section with all required fields
             new_sections.append(f"[{endpoint_id}](aor-tpl)")
@@ -456,7 +456,7 @@ class AdvancedPJSIPConfigParser:
             new_sections.append("default_expiration=3600")
             new_sections.append("minimum_expiration=60")
             new_sections.append("maximum_expiration=7200")
-            new_sections.append("--------------------------------")  # <-- Add blank line after aor section
+            new_sections.append("")  # <-- Add blank line after aor section
             
             # Log final configuration
             logger.info("Final configuration:")
