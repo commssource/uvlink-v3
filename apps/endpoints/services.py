@@ -35,6 +35,10 @@ class AdvancedEndpointService:
         # Organize endpoints into sections
         organized_endpoints = []
         for endpoint in endpoints:
+            # Get auth section data
+            auth_section = f"{endpoint['id']}"
+            auth_data = parser.sections.get(auth_section, {})
+            
             organized = {
                 'id': endpoint['id'],
                 'type': endpoint['type'],
@@ -101,7 +105,14 @@ class AdvancedEndpointService:
                     'voicemail_extension': endpoint.get('voicemail_extension', '')
                 },
                 
-                'auth': endpoint.get('auth', {}),
+                'auth': {
+                    'type': 'auth',
+                    'auth_type': 'userpass',
+                    'username': auth_data.get('username', endpoint['id']),
+                    'password': auth_data.get('password', ''),  # Get password from auth section
+                    'realm': auth_data.get('realm', 'UVLink')
+                },
+                
                 'aor': endpoint.get('aor', {})
             }
             organized_endpoints.append(organized)
