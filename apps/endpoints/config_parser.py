@@ -463,7 +463,7 @@ class AdvancedPJSIPConfigParser:
             
             # Append new sections to file
             with open(self.config_path, 'a') as f:
-                f.write('\n' + '\n'.join(new_sections) + '\n')
+                f.write('\n'.join(new_sections))
             
             logger.info(f"Added endpoint {endpoint_id} efficiently")
             return True
