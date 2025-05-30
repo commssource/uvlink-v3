@@ -38,7 +38,8 @@ class AdvancedEndpointService:
             # Get auth section data by checking section type
             auth_data = {}
             for section_name, section_data in parser.sections.items():
-                if section_name == endpoint['id'] and section_data.get('type') == 'auth':
+                # Check if this section has type=auth
+                if section_data.get('type') == 'auth':
                     auth_data = section_data
                     break
             
