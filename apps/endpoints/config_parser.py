@@ -95,7 +95,7 @@ class AdvancedPJSIPConfigParser:
         aor_section = f"{endpoint_id}"
         if aor_section in self.sections:
             related_sections.append(aor_section)
-            print(f"AOR-AUTH Section: {related_sections}")
+            
         return related_sections
         
     
@@ -465,7 +465,7 @@ class AdvancedPJSIPConfigParser:
             
             # Append new sections to file
             with open(self.config_path, 'a') as f:
-                f.write('\n'.join(new_sections))
+                f.write('\n' + '\n'.join(new_sections))
             
             logger.info(f"Added endpoint {endpoint_id} efficiently")
             return True
