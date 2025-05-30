@@ -82,24 +82,25 @@ class AdvancedPJSIPConfigParser:
         
         return self.sections
     
-    def get_endpoint_sections(self, endpoint_id: str) -> List[str]:
-        """Get all sections related to an endpoint"""
+    def get_endpoint_sections(self, endpoint_id: str) -> List[Tuple[str, Optional[str]]]:
+        """Get all sections related to an endpoint using the new tuple key structure"""
         related_sections = []
-        
+
         # Main endpoint section
-        if endpoint_id in self.sections:
-            related_sections.append(endpoint_id)
-        
+        endpoint_key = (endpoint_id, 'endpoint-tpl')
+        if endpoint_key in self.sections:
+            related_sections.append(endpoint_key)
+
         # Auth section
-        auth_section = f"{endpoint_id}"
-        if auth_section in self.sections:
-            related_sections.append(auth_section)
-        
+        auth_key = (f"{endpoint_id}-auth", None)
+        if auth_key in self.sections:
+            related_sections.append(auth_key)
+
         # AOR section
-        aor_section = f"{endpoint_id}"
-        if aor_section in self.sections:
-            related_sections.append(aor_section)
-            
+        aor_key = (endpoint_id, 'aor-tpl')
+        if aor_key in self.sections:
+            related_sections.append(aor_key)
+
         return related_sections
         
     
