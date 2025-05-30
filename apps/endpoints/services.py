@@ -316,8 +316,6 @@ class AdvancedEndpointService:
         update_data = {'id': endpoint_id}
         
         # Add provided fields
-        if endpoint_data.name is not None:
-            update_data['name'] = endpoint_data.name
         if endpoint_data.context is not None:
             update_data['context'] = endpoint_data.context
         if endpoint_data.callerid is not None:
