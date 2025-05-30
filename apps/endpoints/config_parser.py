@@ -234,32 +234,75 @@ class AdvancedPJSIPConfigParser:
             return False
         
         # Update endpoint section with provided values
+        endpoint_section = {
+            'type': 'endpoint',
+            'aors': endpoint_id,
+            'accountcode': endpoint_id,
+            'subscribe_context': f't-{endpoint_id}',
+            'moh_suggest': 'default',
+            'notify_early_inuse_ringing': 'yes',
+            'refer_blind_progress': 'yes',
+            'auth': endpoint_id,
+            'outbound_auth': endpoint_id,
+            'direct_media': 'no',
+            'force_rport': 'yes',
+            'rtp_symmetric': 'yes',
+            'rewrite_contact': 'yes',
+            'dtmf_mode': 'rfc4733',
+            'context': 'internal',
+            'allow': 'alaw',
+            'use_ptime': 'no'
+        }
+        
+        # Update with provided values
         for key, value in endpoint_data.items():
             if key not in ['id', 'auth', 'aor'] and value is not None:
-                self.sections[endpoint_id][key] = str(value)
-                logger.info(f"Updated endpoint section {endpoint_id} with {key}={value}")
+                endpoint_section[key] = str(value)
         
-        # Update auth section if provided
-        if 'auth' in endpoint_data and endpoint_data['auth']:
-            # Use same ID for auth section
-            auth_section = endpoint_id
-            if auth_section in self.sections:
-                auth_data = endpoint_data['auth']
-                for key, value in auth_data.items():
-                    if value is not None:
-                        self.sections[auth_section][key] = str(value)
-                        logger.info(f"Updated auth section {auth_section} with {key}={value}")
+        # Set callerid if name is provided
+        if 'name' in endpoint_data:
+            endpoint_section['callerid'] = f"{endpoint_data['name']} <{endpoint_id}>"
         
-        # Update AOR section if provided
-        if 'aor' in endpoint_data and endpoint_data['aor']:
-            # Use same ID for aor section
-            aor_section = endpoint_id
-            if aor_section in self.sections:
-                aor_data = endpoint_data['aor']
-                for key, value in aor_data.items():
-                    if value is not None:
-                        self.sections[aor_section][key] = str(value)
-                        logger.info(f"Updated aor section {aor_section} with {key}={value}")
+        self.sections[endpoint_id] = endpoint_section
+        logger.info(f"Updated endpoint section {endpoint_id}")
+        
+        # Update auth section
+        auth_section = f"{endpoint_id}_auth"
+        auth_data = {
+            'type': 'auth',
+            'auth_type': 'userpass',
+            'username': endpoint_id,
+            'password': endpoint_data.get('auth', {}).get('password', ''),
+            'realm': 'UVLink'
+        }
+        self.sections[auth_section] = auth_data
+        logger.info(f"Updated auth section {auth_section}")
+        
+        # Update AOR section
+        aor_section = f"{endpoint_id}_aor"
+        aor_data = {
+            'type': 'aor',
+            'max_contacts': '1',
+            'qualify_frequency': '60',
+            'qualify_timeout': '8',
+            'remove_unavailable': 'yes',
+            'remove_existing': 'yes',
+            'default_expiration': '3600',
+            'minimum_expiration': '60',
+            'maximum_expiration': '7200'
+        }
+        self.sections[aor_section] = aor_data
+        logger.info(f"Updated aor section {aor_section}")
+        
+        # Update order to ensure sections are in correct order
+        if endpoint_id in self.order:
+            self.order.remove(endpoint_id)
+        if auth_section in self.order:
+            self.order.remove(auth_section)
+        if aor_section in self.order:
+            self.order.remove(aor_section)
+        
+        self.order.extend([endpoint_id, auth_section, aor_section])
         
         logger.info(f"Finished updating endpoint {endpoint_id}")
         return True
