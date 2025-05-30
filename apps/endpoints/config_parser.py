@@ -44,12 +44,15 @@ class AdvancedPJSIPConfigParser:
                 if current_section in self.sections:
                     # Get the type of the existing section
                     existing_type = self.sections[current_section].get('type')
-                    # If it's an endpoint section, create new sections for auth and aor
+                    # Only create new sections for endpoint type
                     if existing_type == 'endpoint':
                         if current_section not in section_counter:
                             section_counter[current_section] = 1
                         section_counter[current_section] += 1
                         current_section = f"{current_section}_{section_counter[current_section]}"
+                    else:
+                        # For auth and aor sections, use the same name
+                        current_section = current_section
                 
                 # Store section in order
                 if current_section not in self.order:
@@ -87,16 +90,16 @@ class AdvancedPJSIPConfigParser:
         if endpoint_id in self.sections:
             related_sections.append(endpoint_id)
         
-        # Auth section
-        auth_section = f"{endpoint_id}"
-        if auth_section in self.sections:
+        # Auth section - use same ID
+        auth_section = endpoint_id
+        if auth_section in self.sections and self.sections[auth_section].get('type') == 'auth':
             related_sections.append(auth_section)
         
-        # AOR section
-        aor_section = f"{endpoint_id}"
-        if aor_section in self.sections:
+        # AOR section - use same ID
+        aor_section = endpoint_id
+        if aor_section in self.sections and self.sections[aor_section].get('type') == 'aor':
             related_sections.append(aor_section)
-            print(f"AOR-AUTH Section: {related_sections}")
+        
         return related_sections
         
     
