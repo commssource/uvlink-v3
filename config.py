@@ -12,16 +12,14 @@ from datetime import timedelta
 load_dotenv()
 
 # Application settings
-APP_NAME = "Asterisk Management Platform"
-APP_VERSION = "1.0.0"
-APP_DESCRIPTION = "REST API for managing Asterisk PBX"
+APP_NAME = "UVLink Platform"
+APP_VERSION = "1.2.0"
+APP_DESCRIPTION = "Dashboard for managing UVLink"
 
 # Asterisk configuration
 ASTERISK_CONFIG_PATH = os.getenv("ASTERISK_CONFIG_PATH")
-print("ASTERISK_CONFIG_PATH", ASTERISK_CONFIG_PATH)
 ASTERISK_PJSIP_CONFIG = os.path.join(ASTERISK_CONFIG_PATH, "pjsip.conf")
-ASTERISK_BACKUP_PATH = os.getenv("ASTERISK_BACKUP_PATH", "/etc/asterisk/backups/")
-print("ASTERISK_BACKUP_PATH", ASTERISK_BACKUP_PATH)
+ASTERISK_BACKUP_PATH = os.getenv("ASTERISK_BACKUP_PATH")
 ASTERISK_USER = os.getenv("ASTERISK_USER", "asterisk")
 
 # Database configuration
@@ -44,7 +42,7 @@ DATABASE_URL = os.getenv("DATABASE_URL", DATABASE_URL)
 DATABASE_ECHO = os.getenv("DATABASE_ECHO", "false").lower() == "true"
 
 # Security
-API_KEY = os.getenv("API_KEY", "your-secure-api-key-here")
+API_KEY = os.getenv("API_KEY", "XFYMsQwBwnyzd-6GNVfoNbFP2EF-tPnA69JQdZQUWAM")
 API_KEY_FILE = os.getenv("API_KEY_FILE")
 JWT_SECRET =  os.getenv("JWT_SECRET")
 JWT_ALGORITHM =  os.getenv("JWT_ALGORITHM")
@@ -64,4 +62,3 @@ LOG_LEVEL = os.getenv("LOG_LEVEL", "info")
 CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*").split(",")
 
 # Apps configuration
-ENABLED_APPS = ["endpoints"]

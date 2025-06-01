@@ -15,14 +15,14 @@ touch /opt/pjsip-manager/apps/__init__.py
 touch /opt/pjsip-manager/apps/endpoints/__init__.py
 
 # Create .env file
-cat > /opt/pjsip-manager/.env << 'EOF'
-API_KEY=change-this-super-secure-key-here
-ASTERISK_CONFIG_PATH=/etc/asterisk/
-ASTERISK_BACKUP_PATH=/etc/asterisk/backups/
-ASTERISK_USER=asterisk
-HOST=0.0.0.0
-PORT=8000
-LOG_LEVEL=info
+# cat > /opt/pjsip-manager/.env << 'EOF'
+# API_KEY=change-this-super-secure-key-here
+# ASTERISK_CONFIG_PATH=/etc/asterisk/
+# ASTERISK_BACKUP_PATH=/etc/asterisk/backups/
+# ASTERISK_USER=asterisk
+# HOST=0.0.0.0
+# PORT=8000
+# LOG_LEVEL=info
 EOF
 
 echo "✅ Minimal structure created"

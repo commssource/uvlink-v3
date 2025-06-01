@@ -65,11 +65,12 @@ try:
 except ImportError as e:
     logger.error(f"❌ Failed to load apps: {e}")
 
+
 @app.get("/")
 async def root():
     return {
         "message": f"{APP_NAME} is running",
-        "version": APP_VERSION,
+        "version": "UVL0.098",
         "docs": "/docs"
     }
 

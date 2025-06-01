@@ -9,8 +9,8 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 
-ASTERISK_CONFIG_PATH = "/etc/asterisk/pjsip.conf"
-ASTERISK_BACKUP_PATH = "/etc/asterisk/backups/"
+# ASTERISK_CONFIG_PATH = "/etc/asterisk/pjsip.conf"
+# ASTERISK_BACKUP_PATH = "/etc/asterisk/backups/"
 
 def list_backups():
     """List available backups"""
