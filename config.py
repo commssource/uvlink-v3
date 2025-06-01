@@ -11,18 +11,17 @@ from datetime import timedelta
 # Load environment variables from .env file
 load_dotenv()
 
-# Asterisk configuration
-ASTERISK_CONFIG_PATH = os.getenv("ASTERISK_CONFIG_PATH")
-
 # Application settings
 APP_NAME = "Asterisk Management Platform"
 APP_VERSION = "1.0.0"
 APP_DESCRIPTION = "REST API for managing Asterisk PBX"
 
 # Asterisk configuration
-ASTERISK_CONFIG_PATH = os.getenv("ASTERISK_CONFIG_PATH", "/etc/asterisk/")
+ASTERISK_CONFIG_PATH = os.getenv("ASTERISK_CONFIG_PATH")
+print("ASTERISK_CONFIG_PATH", ASTERISK_CONFIG_PATH)
 ASTERISK_PJSIP_CONFIG = os.path.join(ASTERISK_CONFIG_PATH, "pjsip.conf")
 ASTERISK_BACKUP_PATH = os.getenv("ASTERISK_BACKUP_PATH", "/etc/asterisk/backups/")
+print("ASTERISK_BACKUP_PATH", ASTERISK_BACKUP_PATH)
 ASTERISK_USER = os.getenv("ASTERISK_USER", "asterisk")
 
 # Database configuration
