@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Union
 import json
 
 from .schemas import (
@@ -8,14 +8,15 @@ from .schemas import (
     EndpointValidation, EndpointListResponse
 )
 from .services import AdvancedEndpointService
-from shared.auth import verify_api_key
+from shared.auth import verify_api_key, verify_auth, create_access_token
 from shared.utils import execute_asterisk_command
 from datetime import datetime
 
-router = APIRouter(prefix="/endpoints", tags=["endpoints"])
+router = APIRouter(prefix="/api/v1/endpoints", tags=["endpoints"])
+
 
 @router.get("/", response_model=EndpointListResponse)
-async def list_endpoints(api_key: str = Depends(verify_api_key)):
+async def list_endpoints(auth: Union[str, dict] = Depends(verify_auth)):
     """List all endpoints from current configuration"""
     try:
         endpoints = AdvancedEndpointService.list_endpoints()
@@ -30,7 +31,7 @@ async def list_endpoints(api_key: str = Depends(verify_api_key)):
 @router.get("/{endpoint_id}", response_model=dict)
 async def get_endpoint(
     endpoint_id: str,
-    api_key: str = Depends(verify_api_key)
+    auth: Union[str, dict] = Depends(verify_auth)
 ):
     """Get specific endpoint details"""
     endpoint = AdvancedEndpointService.get_endpoint(endpoint_id)
@@ -41,7 +42,7 @@ async def get_endpoint(
 @router.post("/simple", response_model=StatusResponse)
 async def add_simple_endpoint(
     endpoint_data: SimpleEndpoint,
-    api_key: str = Depends(verify_api_key)
+    auth: Union[str, dict] = Depends(verify_auth)
 ):
     """Add a simple endpoint (basic configuration)"""
     try:
@@ -58,7 +59,7 @@ async def add_simple_endpoint(
 @router.post("/advanced", response_model=StatusResponse)
 async def add_advanced_endpoint(
     endpoint_data: AdvancedEndpoint,
-    api_key: str = Depends(verify_api_key)
+    auth: Union[str, dict] = Depends(verify_auth)
 ):
     """Add an advanced endpoint (full configuration)"""
     try:
@@ -76,7 +77,7 @@ async def add_advanced_endpoint(
 @router.post("/from-json", response_model=StatusResponse)
 async def add_endpoint_from_json(
     endpoint_json: Dict[str, Any],
-    api_key: str = Depends(verify_api_key)
+    auth: Union[str, dict] = Depends(verify_auth)
 ):
     """Add endpoint from your exact JSON format"""
     try:
@@ -106,7 +107,7 @@ async def add_endpoint_from_json(
 @router.post("/bulk", response_model=StatusResponse)
 async def add_bulk_endpoints(
     bulk_data: BulkEndpointCreate,
-    api_key: str = Depends(verify_api_key)
+    auth: Union[str, dict] = Depends(verify_auth)
 ):
     """Add multiple endpoints at once"""
     try:
@@ -129,7 +130,7 @@ async def add_bulk_endpoints(
 async def import_endpoints_json(
     endpoints_json: List[Dict[str, Any]],
     overwrite: bool = False,
-    api_key: str = Depends(verify_api_key)
+    auth: Union[str, dict] = Depends(verify_auth)
 ):
     """Import multiple endpoints from JSON format"""
     try:
@@ -151,7 +152,7 @@ async def import_endpoints_json(
 async def import_endpoints_file(
     file: UploadFile = File(...),
     overwrite: bool = False,
-    api_key: str = Depends(verify_api_key)
+    auth: Union[str, dict] = Depends(verify_auth)
 ):
     """Import endpoints from JSON file"""
     try:
@@ -190,7 +191,7 @@ async def import_endpoints_file(
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/export/json")
-async def export_endpoints_json(api_key: str = Depends(verify_api_key)):
+async def export_endpoints_json(auth: Union[str, dict] = Depends(verify_auth)):
     """Export all endpoints to JSON format"""
     try:
         endpoints = AdvancedEndpointService.export_endpoints_to_json()
@@ -207,7 +208,7 @@ async def export_endpoints_json(api_key: str = Depends(verify_api_key)):
 async def update_endpoint(
     endpoint_id: str,
     endpoint_data: EndpointUpdate,
-    api_key: str = Depends(verify_api_key)
+    auth: Union[str, dict] = Depends(verify_auth)
 ):
     """Update an existing endpoint"""
     try:
@@ -224,7 +225,7 @@ async def update_endpoint(
 @router.delete("/{endpoint_id}", response_model=StatusResponse)
 async def delete_endpoint(
     endpoint_id: str,
-    api_key: str = Depends(verify_api_key)
+    auth: Union[str, dict] = Depends(verify_auth)
 ):
     """Delete an endpoint safely (preserves other config)"""
     try:
@@ -239,7 +240,7 @@ async def delete_endpoint(
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/config/current", response_model=ConfigResponse)
-async def get_current_config(api_key: str = Depends(verify_api_key)):
+async def get_current_config(auth: Union[str, dict] = Depends(verify_auth)):
     """Get current PJSIP configuration"""
     config_content = AdvancedEndpointService.get_current_config()
     
@@ -250,7 +251,7 @@ async def get_current_config(api_key: str = Depends(verify_api_key)):
     )
 
 @router.post("/reload", response_model=ReloadResponse)
-async def reload_endpoints(api_key: str = Depends(verify_api_key)):
+async def reload_endpoints(auth: Union[str, dict] = Depends(verify_auth)):
     """Reload PJSIP configuration in Asterisk"""
     success, output = AdvancedEndpointService.reload_pjsip()
     
@@ -261,7 +262,7 @@ async def reload_endpoints(api_key: str = Depends(verify_api_key)):
     )
 
 @router.get("/show/asterisk", response_model=ReloadResponse)
-async def show_asterisk_endpoints(api_key: str = Depends(verify_api_key)):
+async def show_asterisk_endpoints(auth: Union[str, dict] = Depends(verify_auth)):
     """Show current PJSIP endpoints from Asterisk"""
     success, output = execute_asterisk_command("pjsip show endpoints")
     
@@ -274,7 +275,7 @@ async def show_asterisk_endpoints(api_key: str = Depends(verify_api_key)):
 @router.get("/validate/{endpoint_id}", response_model=EndpointValidation)
 async def validate_endpoint_id(
     endpoint_id: str,
-    api_key: str = Depends(verify_api_key)
+    auth: Union[str, dict] = Depends(verify_auth)
 ):
     """Validate if endpoint ID is available"""
     # Check in config file
@@ -301,7 +302,7 @@ async def validate_endpoint_id(
 @router.post("/validate/data", response_model=Dict[str, Any])
 async def validate_endpoint_data(
     endpoint_json: Dict[str, Any],
-    api_key: str = Depends(verify_api_key)
+    auth: Union[str, dict] = Depends(verify_auth)
 ):
     """Validate endpoint data before adding"""
     try:
@@ -317,7 +318,7 @@ async def validate_endpoint_data(
 @router.post("/", response_model=StatusResponse)
 async def add_endpoint_legacy(
     endpoint_data: SimpleEndpoint,
-    api_key: str = Depends(verify_api_key)
+    auth: Union[str, dict] = Depends(verify_auth)
 ):
     """Legacy endpoint for backward compatibility - adds simple endpoint"""
-    return await add_simple_endpoint(endpoint_data, api_key)
+    return await add_simple_endpoint(endpoint_data, auth)

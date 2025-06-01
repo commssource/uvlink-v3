@@ -6,6 +6,7 @@
 import os
 from pathlib import Path
 from dotenv import load_dotenv
+from datetime import timedelta
 
 # Load environment variables from .env file
 load_dotenv()
@@ -43,6 +44,9 @@ DATABASE_ECHO = os.getenv("DATABASE_ECHO", "false").lower() == "true"
 # Security
 API_KEY = os.getenv("API_KEY", "your-secure-api-key-here")
 API_KEY_FILE = os.getenv("API_KEY_FILE")
+JWT_SECRET =  os.getenv("JWT_SECRET")
+JWT_ALGORITHM =  os.getenv("JWT_ALGORITHM")
+JWT_EXPIRATION_DELTA = timedelta(hours=24)
 
 # Load API key from file if specified
 if API_KEY_FILE and Path(API_KEY_FILE).exists():

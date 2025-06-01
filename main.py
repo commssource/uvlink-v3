@@ -6,18 +6,35 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import logging
+from contextlib import asynccontextmanager
 
 from config import (
     APP_NAME, APP_VERSION, APP_DESCRIPTION,
     CORS_ORIGINS, HOST, PORT, LOG_LEVEL
 )
-
 # Initialize database
 from shared.database import init_database
+
+# Import routers
+from apps.endpoints.routes import router as endpoints_router
+from shared.auth.routes import router as auth_router
 
 # Setup logging
 logging.basicConfig(level=getattr(logging, LOG_LEVEL.upper()))
 logger = logging.getLogger(__name__)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Initialize application on startup and cleanup on shutdown"""
+    logger.info("🚀 Starting Asterisk Management Platform...")
+    
+    # Initialize database
+    if init_database():
+        logger.info("✅ Database ready")
+    else:
+        logger.warning("⚠️ Database initialization had issues")
+    
+    yield
 
 # Create FastAPI app
 app = FastAPI(
@@ -25,7 +42,8 @@ app = FastAPI(
     description=APP_DESCRIPTION,
     version=APP_VERSION,
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
+    lifespan=lifespan
 )
 
 # CORS middleware
@@ -37,13 +55,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Import endpoints router
 try:
-    from apps.endpoints.routes import router as endpoints_router
-    app.include_router(endpoints_router, prefix="/api/v1")
+    # Include routers
+    app.include_router(endpoints_router)
+    app.include_router(auth_router)
+    
     logger.info("✅ Endpoints app loaded")
+    logger.info("✅ Auth app loaded")
 except ImportError as e:
-    logger.error(f"❌ Failed to load endpoints app: {e}")
+    logger.error(f"❌ Failed to load apps: {e}")
 
 @app.get("/")
 async def root():
@@ -70,17 +90,13 @@ async def health_check():
         "version": APP_VERSION
     }
 
-# Startup event
-@app.on_event("startup")
-async def startup_event():
-    """Initialize application on startup"""
-    logger.info("🚀 Starting Asterisk Management Platform...")
-    
-    # Initialize database
-    if init_database():
-        logger.info("✅ Database ready")
-    else:
-        logger.warning("⚠️ Database initialization had issues")
-
 if __name__ == "__main__":
-    uvicorn.run("main:app", host=HOST, port=PORT, reload=True, log_level=LOG_LEVEL)
+    uvicorn.run(
+        "main:app",
+        host=HOST,
+        port=PORT,
+        reload=True,
+        log_level=LOG_LEVEL,
+        reload_dirs=["."],  # Only watch the current directory
+        reload_excludes=["venv/*"]  # Exclude the virtual environment
+    )
