@@ -5,6 +5,8 @@ import re
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from fastapi import HTTPException
+from config import ASTERISK_CONFIG_PATH
+
 
 from .schemas import (
     AdvancedEndpoint, SimpleEndpoint, EndpointCreate, EndpointUpdate,
@@ -16,13 +18,15 @@ from config import ASTERISK_PJSIP_CONFIG
 
 logger = logging.getLogger(__name__)
 
+
+
 class AdvancedEndpointService:
     """Advanced service for managing PJSIP endpoints with full configuration support"""
     
     @staticmethod
     def get_parser() -> AdvancedPJSIPConfigParser:
         """Get a configured parser instance"""
-        parser = AdvancedPJSIPConfigParser(ASTERISK_PJSIP_CONFIG)
+        parser = AdvancedPJSIPConfigParser(ASTERISK_CONFIG_PATH)
         parser.parse()
         return parser
     
@@ -227,7 +231,7 @@ class AdvancedEndpointService:
             logger.info(f"Converting simple endpoint to advanced format: {advanced_data}")
             
             # Add endpoint using parser
-            parser = AdvancedPJSIPConfigParser("/etc/asterisk/pjsip.conf")
+            parser = AdvancedPJSIPConfigParser(ASTERISK_CONFIG_PATH)
             success = parser.add_endpoint_efficient(advanced_data)
             
             if not success:

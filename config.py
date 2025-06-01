@@ -11,6 +11,9 @@ from datetime import timedelta
 # Load environment variables from .env file
 load_dotenv()
 
+# Asterisk configuration
+ASTERISK_CONFIG_PATH = os.getenv("ASTERISK_CONFIG_PATH")
+
 # Application settings
 APP_NAME = "Asterisk Management Platform"
 APP_VERSION = "1.0.0"

@@ -244,7 +244,7 @@ class AdvancedPJSIPConfigParser:
             aor_data = aor_sections.get(section_name, {})
             
             # Build complete endpoint info
-            endpoint_info = {'id': section_name}
+            endpoint_info = {'id': section_name[0]}
             
             # Add endpoint options
             for key in self.endpoint_options:
