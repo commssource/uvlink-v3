@@ -3,8 +3,8 @@ from typing import List, Dict, Any, Union
 import json
 
 from .schemas import (
-    AdvancedEndpoint, SimpleEndpoint, EndpointCreate, EndpointUpdate,
-    BulkEndpointCreate, StatusResponse, ReloadResponse, ConfigResponse, 
+    AdvancedEndpoint, EndpointUpdate,
+    StatusResponse, ConfigResponse, 
     EndpointValidation, EndpointListResponse
 )
 from .services import AdvancedEndpointService
@@ -39,50 +39,15 @@ async def get_endpoint(
         raise HTTPException(status_code=404, detail="Endpoint not found")
     return endpoint
 
-@router.post("/simple", response_model=StatusResponse)
-async def add_simple_endpoint(
-    endpoint_data: SimpleEndpoint,
-    auth: Union[str, dict] = Depends(verify_auth)
-):
-    """Add a simple endpoint (basic configuration)"""
-    try:
-        if AdvancedEndpointService.add_simple_endpoint(endpoint_data):
-            return StatusResponse(
-                success=True,
-                message=f"Simple endpoint {endpoint_data.id} added successfully"
-            )
-        else:
-            raise HTTPException(status_code=400, detail="Failed to add endpoint (may already exist)")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
 @router.post("/advanced", response_model=StatusResponse)
-async def add_advanced_endpoint(
+async def add_endpoint(
     endpoint_data: AdvancedEndpoint,
     auth: Union[str, dict] = Depends(verify_auth)
 ):
-    """Add an advanced endpoint (full configuration)"""
-    try:
-        endpoint_dict = endpoint_data.model_dump()
-        if AdvancedEndpointService.add_endpoint_from_json(endpoint_dict):
-            return StatusResponse(
-                success=True,
-                message=f"Advanced endpoint {endpoint_data.id} added successfully"
-            )
-        else:
-            raise HTTPException(status_code=400, detail="Failed to add endpoint (may already exist)")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.post("/from-json", response_model=StatusResponse)
-async def add_endpoint_from_json(
-    endpoint_json: Dict[str, Any],
-    auth: Union[str, dict] = Depends(verify_auth)
-):
-    """Add endpoint from your exact JSON format"""
+    """Add an endpoint with full configuration"""
     try:
         # Validate the data first
-        validation = AdvancedEndpointService.validate_endpoint_data(endpoint_json)
+        validation = AdvancedEndpointService.validate_endpoint_data(endpoint_data.model_dump())
         if not validation['valid']:
             return StatusResponse(
                 success=False,
@@ -93,134 +58,42 @@ async def add_endpoint_from_json(
                 }
             )
         
-        if AdvancedEndpointService.add_endpoint_from_json(endpoint_json):
+        # Check if endpoint already exists
+        existing_endpoint = AdvancedEndpointService.get_endpoint(endpoint_data.id)
+        if existing_endpoint:
+            return StatusResponse(
+                success=False,
+                message=f"Endpoint {endpoint_data.id} already exists",
+                details={'errors': [f"Endpoint ID '{endpoint_data.id}' is already in use"]}
+            )
+        
+        if AdvancedEndpointService.add_endpoint_from_json(endpoint_data.model_dump()):
             return StatusResponse(
                 success=True,
-                message=f"Endpoint {endpoint_json['id']} added successfully",
+                message=f"Endpoint {endpoint_data.id} added successfully",
                 details={'warnings': validation['warnings']} if validation['warnings'] else None
             )
         else:
-            raise HTTPException(status_code=400, detail="Failed to add endpoint")
+            return StatusResponse(
+                success=False,
+                message="Failed to add endpoint",
+                details={'errors': ["Failed to add endpoint to configuration"]}
+            )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.post("/bulk", response_model=StatusResponse)
-async def add_bulk_endpoints(
-    bulk_data: BulkEndpointCreate,
-    auth: Union[str, dict] = Depends(verify_auth)
-):
-    """Add multiple endpoints at once"""
-    try:
-        results = AdvancedEndpointService.add_bulk_endpoints(bulk_data)
-        
-        total = len(bulk_data.endpoints)
-        success_count = len(results['success'])
-        failed_count = len(results['failed'])
-        skipped_count = len(results['skipped'])
-        
+        logger.error(f"Error adding endpoint: {str(e)}")
         return StatusResponse(
-            success=success_count > 0,
-            message=f"Bulk operation complete: {success_count} added, {failed_count} failed, {skipped_count} skipped",
-            details=results
+            success=False,
+            message="Failed to add endpoint",
+            details={'errors': [str(e)]}
         )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.post("/import", response_model=StatusResponse)
-async def import_endpoints_json(
-    endpoints_json: List[Dict[str, Any]],
-    overwrite: bool = False,
-    auth: Union[str, dict] = Depends(verify_auth)
-):
-    """Import multiple endpoints from JSON format"""
-    try:
-        results = AdvancedEndpointService.import_endpoints_from_json(endpoints_json, overwrite)
-        
-        success_count = len(results['success'])
-        failed_count = len(results['failed'])
-        skipped_count = len(results['skipped'])
-        
-        return StatusResponse(
-            success=success_count > 0,
-            message=f"Import complete: {success_count} imported, {failed_count} failed, {skipped_count} skipped",
-            details=results
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.post("/import-file", response_model=StatusResponse)
-async def import_endpoints_file(
-    file: UploadFile = File(...),
-    overwrite: bool = False,
-    auth: Union[str, dict] = Depends(verify_auth)
-):
-    """Import endpoints from JSON file"""
-    try:
-        # Read file content
-        content = await file.read()
-        
-        # Parse JSON
-        try:
-            if file.filename.endswith('.json'):
-                endpoints_json = json.loads(content.decode('utf-8'))
-            else:
-                raise ValueError("Only JSON files are supported")
-        except json.JSONDecodeError as e:
-            raise HTTPException(status_code=400, detail=f"Invalid JSON format: {e}")
-        
-        # Ensure it's a list
-        if not isinstance(endpoints_json, list):
-            if isinstance(endpoints_json, dict):
-                endpoints_json = [endpoints_json]  # Single endpoint
-            else:
-                raise HTTPException(status_code=400, detail="JSON must contain a list of endpoints")
-        
-        # Import endpoints
-        results = AdvancedEndpointService.import_endpoints_from_json(endpoints_json, overwrite)
-        
-        success_count = len(results['success'])
-        failed_count = len(results['failed'])
-        skipped_count = len(results['skipped'])
-        
-        return StatusResponse(
-            success=success_count > 0,
-            message=f"File import complete: {success_count} imported, {failed_count} failed, {skipped_count} skipped",
-            details=results
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.get("/export/json")
-async def export_endpoints_json(auth: Union[str, dict] = Depends(verify_auth)):
-    """Export all endpoints to JSON format"""
-    try:
-        endpoints = AdvancedEndpointService.export_endpoints_to_json()
-        return {
-            "success": True,
-            "count": len(endpoints),
-            "endpoints": endpoints,
-            "exported_at": datetime.now().isoformat()
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 @router.put("/{endpoint_id}", response_model=StatusResponse)
-async def update_endpoint(
-    endpoint_id: str,
-    endpoint_data: EndpointUpdate,
-    auth: Union[str, dict] = Depends(verify_auth)
-):
+async def update_endpoint(endpoint_id: str, endpoint_data: EndpointUpdate):
     """Update an existing endpoint"""
-    try:
-        if AdvancedEndpointService.update_endpoint(endpoint_id, endpoint_data):
-            return StatusResponse(
-                success=True,
-                message=f"Endpoint {endpoint_id} updated successfully"
-            )
-        else:
-            raise HTTPException(status_code=404, detail="Endpoint not found")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    success, message = AdvancedEndpointService.update_endpoint(endpoint_id, endpoint_data)
+    if not success:
+        raise HTTPException(status_code=404, detail=message)
+    return StatusResponse(success=True, message=message)
 
 @router.delete("/{endpoint_id}", response_model=StatusResponse)
 async def delete_endpoint(
@@ -248,28 +121,6 @@ async def get_current_config(auth: Union[str, dict] = Depends(verify_auth)):
         success=True,
         config=config_content,
         timestamp=datetime.now().isoformat()
-    )
-
-@router.post("/reload", response_model=ReloadResponse)
-async def reload_endpoints(auth: Union[str, dict] = Depends(verify_auth)):
-    """Reload PJSIP configuration in Asterisk"""
-    success, output = AdvancedEndpointService.reload_pjsip()
-    
-    return ReloadResponse(
-        success=success,
-        message="PJSIP reloaded successfully" if success else "PJSIP reload failed",
-        output=output
-    )
-
-@router.get("/show/asterisk", response_model=ReloadResponse)
-async def show_asterisk_endpoints(auth: Union[str, dict] = Depends(verify_auth)):
-    """Show current PJSIP endpoints from Asterisk"""
-    success, output = execute_asterisk_command("pjsip show endpoints")
-    
-    return ReloadResponse(
-        success=success,
-        message="Endpoints retrieved successfully" if success else "Failed to retrieve endpoints",
-        output=output
     )
 
 @router.get("/validate/{endpoint_id}", response_model=EndpointValidation)
@@ -313,12 +164,4 @@ async def validate_endpoint_data(
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-# Legacy compatibility endpoints
-@router.post("/", response_model=StatusResponse)
-async def add_endpoint_legacy(
-    endpoint_data: SimpleEndpoint,
-    auth: Union[str, dict] = Depends(verify_auth)
-):
-    """Legacy endpoint for backward compatibility - adds simple endpoint"""
-    return await add_simple_endpoint(endpoint_data, auth)
+    

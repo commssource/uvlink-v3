@@ -165,39 +165,157 @@ class AdvancedPJSIPConfigParser:
     
     def update_endpoint(self, endpoint_data: Dict[str, Any]) -> bool:
         """Update an existing endpoint"""
-        endpoint_id = endpoint_data['id']
-        endpoint_key = (endpoint_id, 'endpoint-tpl')
-        auth_key = (f"{endpoint_id}-auth", None)
-        aor_key = (endpoint_id, 'aor-tpl')
+        old_endpoint_id = endpoint_data.get('old_id')  # Get the old ID from the data
+        new_endpoint_id = endpoint_data['id']  # Get the new ID from the data
+        
+        logger.info(f"Updating endpoint from {old_endpoint_id} to {new_endpoint_id}")
+        
+        # If IDs are different, we need to rename the sections
+        if old_endpoint_id and old_endpoint_id != new_endpoint_id:
+            old_endpoint_key = (old_endpoint_id, 'endpoint-tpl')
+            old_auth_key = (f"{old_endpoint_id}-auth", None)
+            old_aor_key = (old_endpoint_id, 'aor-tpl')
+            
+            # Check if old endpoint exists
+            if old_endpoint_key not in self.sections:
+                logger.warning(f"Endpoint {old_endpoint_id} does not exist")
+                return False
+            
+            # Create new section keys
+            new_endpoint_key = (new_endpoint_id, 'endpoint-tpl')
+            new_auth_key = (f"{new_endpoint_id}-auth", None)
+            new_aor_key = (new_endpoint_id, 'aor-tpl')
+            
+            # Move sections to new keys
+            self.sections[new_endpoint_key] = self.sections.pop(old_endpoint_key)
+            if old_auth_key in self.sections:
+                self.sections[new_auth_key] = self.sections.pop(old_auth_key)
+            if old_aor_key in self.sections:
+                self.sections[new_aor_key] = self.sections.pop(old_aor_key)
+            
+            # Update order
+            if old_endpoint_key in self.order:
+                idx = self.order.index(old_endpoint_key)
+                self.order[idx] = new_endpoint_key
+            if old_auth_key in self.order:
+                idx = self.order.index(old_auth_key)
+                self.order[idx] = new_auth_key
+            if old_aor_key in self.order:
+                idx = self.order.index(old_aor_key)
+                self.order[idx] = new_aor_key
+            
+            # Update references in the endpoint section
+            endpoint_section = self.sections[new_endpoint_key]
+            if 'auth' in endpoint_section:
+                endpoint_section['auth'] = f"{new_endpoint_id}-auth"
+            if 'outbound_auth' in endpoint_section:
+                endpoint_section['outbound_auth'] = f"{new_endpoint_id}-auth"
+            if 'aors' in endpoint_section:
+                endpoint_section['aors'] = new_endpoint_id
+            
+            # Update references in auth section
+            if new_auth_key in self.sections:
+                auth_section = self.sections[new_auth_key]
+                if 'username' in auth_section:
+                    auth_section['username'] = new_endpoint_id
+            
+            logger.info(f"Renamed endpoint from {old_endpoint_id} to {new_endpoint_id}")
+        
+        # Now proceed with normal update using new ID
+        endpoint_key = (new_endpoint_id, 'endpoint-tpl')
+        auth_key = (f"{new_endpoint_id}-auth", None)
+        aor_key = (new_endpoint_id, 'aor-tpl')
 
         if endpoint_key not in self.sections:
-            logger.warning(f"Endpoint {endpoint_id} does not exist")
+            logger.warning(f"Endpoint {new_endpoint_id} does not exist")
             return False
 
+        logger.info(f"Before update: {self.sections[endpoint_key]}")
+        
         # Update endpoint section
-        for key in self.endpoint_options:
-            if key in endpoint_data and endpoint_data[key] is not None:
-                if key == "aors":
-                    self.sections[endpoint_key][key] = str(endpoint_data.get("aors", endpoint_id))
-                elif key == "auth" or key == "outbound_auth":
-                    self.sections[endpoint_key][key] = f"{endpoint_id}-auth"
-                else:
-                    self.sections[endpoint_key][key] = str(endpoint_data[key])
+        for key, value in endpoint_data.items():
+            if key in ['id', 'old_id']:  # Skip both old and new IDs
+                continue
+                
+            if isinstance(value, dict):
+                # Handle nested fields
+                if key == 'auth':
+                    # Update auth section
+                    if auth_key not in self.sections:
+                        self.sections[auth_key] = {'type': 'auth'}
+                    for nested_key, nested_value in value.items():
+                        if nested_value is not None:
+                            # If this is a username field and we're changing IDs, update it
+                            if nested_key == 'username' and old_endpoint_id != new_endpoint_id:
+                                self.sections[auth_key][nested_key] = new_endpoint_id
+                            else:
+                                self.sections[auth_key][nested_key] = str(nested_value)
+                elif key == 'aor':
+                    # Update aor section
+                    if aor_key not in self.sections:
+                        self.sections[aor_key] = {'type': 'aor'}
+                    for nested_key, nested_value in value.items():
+                        if nested_value is not None:
+                            self.sections[aor_key][nested_key] = str(nested_value)
+                elif key == 'transport_network':
+                    # Update transport network settings
+                    for nested_key, nested_value in value.items():
+                        if nested_value is not None:
+                            if nested_key == 'transport':
+                                self.sections[endpoint_key]['transport'] = str(nested_value)
+                            else:
+                                self.sections[endpoint_key][nested_key] = str(nested_value)
+                elif key == 'audio_media':
+                    # Update audio media settings
+                    for nested_key, nested_value in value.items():
+                        if nested_value is not None:
+                            self.sections[endpoint_key][nested_key] = str(nested_value)
+                elif key == 'rtp':
+                    # Update RTP settings
+                    for nested_key, nested_value in value.items():
+                        if nested_value is not None:
+                            self.sections[endpoint_key][nested_key] = str(nested_value)
+                elif key == 'recording':
+                    # Update recording settings
+                    for nested_key, nested_value in value.items():
+                        if nested_value is not None:
+                            self.sections[endpoint_key][nested_key] = str(nested_value)
+                elif key == 'call':
+                    # Update call settings
+                    for nested_key, nested_value in value.items():
+                        if nested_value is not None:
+                            self.sections[endpoint_key][nested_key] = str(nested_value)
+                elif key == 'presence':
+                    # Update presence settings
+                    for nested_key, nested_value in value.items():
+                        if nested_value is not None:
+                            self.sections[endpoint_key][nested_key] = str(nested_value)
+                elif key == 'voicemail':
+                    # Update voicemail settings
+                    for nested_key, nested_value in value.items():
+                        if nested_value is not None:
+                            self.sections[endpoint_key][nested_key] = str(nested_value)
+            else:
+                # Handle direct fields
+                if value is not None:
+                    # If we're changing IDs, update these fields automatically
+                    if old_endpoint_id != new_endpoint_id:
+                        if key in ['accountcode', 'from_user'] and str(value) == old_endpoint_id:
+                            self.sections[endpoint_key][key] = new_endpoint_id
+                        else:
+                            self.sections[endpoint_key][key] = str(value)
+                    else:
+                        self.sections[endpoint_key][key] = str(value)
 
-        # Update auth section
-        if 'auth' in endpoint_data and endpoint_data['auth']:
-            for key in self.auth_options:
-                if key in endpoint_data['auth'] and endpoint_data['auth'][key] is not None:
-                    self.sections[auth_key][key] = str(endpoint_data['auth'][key])
+        logger.info(f"After update: {self.sections[endpoint_key]}")
+        logger.info(f"Updated endpoint {new_endpoint_id}")
 
-        # Update aor section
-        if 'aor' in endpoint_data and endpoint_data['aor']:
-            for key in self.aor_options:
-                if key in endpoint_data['aor'] and endpoint_data['aor'][key] is not None:
-                    self.sections[aor_key][key] = str(endpoint_data['aor'][key])
-
-        logger.info(f"Updated endpoint {endpoint_id}")
-        return True
+        # Save the changes
+        try:
+            return self.save(backup_suffix=f"update_{new_endpoint_id}")
+        except Exception as e:
+            logger.error(f"Failed to save changes: {e}")
+            return False
     
     def delete_endpoint(self, endpoint_id: str) -> bool:
         """Delete an endpoint and all related sections"""
@@ -273,6 +391,7 @@ class AdvancedPJSIPConfigParser:
     
     def save(self, backup_suffix: str = None) -> bool:
         """Save the configuration back to file"""
+        logger.info(f"Saving config to {self.config_path}")
         try:
             # Create backup
             if backup_suffix:

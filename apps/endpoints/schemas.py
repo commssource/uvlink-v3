@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, field_validator, validator
+from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional, Dict, Any, Union
 from datetime import datetime
 import re
@@ -106,14 +106,47 @@ class AdvancedEndpoint(BaseModel):
     """Advanced PJSIP Endpoint with all configuration options organized by category"""
     id: str = Field(..., min_length=1, max_length=50, pattern=r'^[a-zA-Z0-9_-]+$')
     type: str = Field(default="endpoint")
+    context: str = Field(default="internal")
+    disallow: str = Field(default="all")
     accountcode: Optional[str] = Field(None, max_length=20)
-    audio_media: AudioMediaSettings = Field(default_factory=AudioMediaSettings)
-    transport_network: TransportNetworkSettings = Field(default_factory=TransportNetworkSettings)
-    rtp: RTPSettings = Field(default_factory=RTPSettings)
-    recording: RecordingSettings = Field(default_factory=RecordingSettings)
-    call: CallSettings = Field(default_factory=CallSettings)
-    presence: PresenceSettings = Field(default_factory=PresenceSettings)
-    voicemail: VoicemailSettings = Field(default_factory=VoicemailSettings)
+    max_audio_streams: int = Field(default=2)
+    device_state_busy_at: int = Field(default=2)
+    allow_transfer: str = Field(default="yes")
+    outbound_auth: Optional[str] = Field(default="")
+    callerid: Optional[str] = Field(None)
+    callerid_privacy: Optional[str] = Field(default="")
+    connected_line_method: str = Field(default="invite")
+    transport_network: Optional[TransportNetworkSettings] = Field(default_factory=TransportNetworkSettings)
+    audio_media: Optional[AudioMediaSettings] = Field(default_factory=AudioMediaSettings)
+    identify_by: str = Field(default="username")
+    deny: Optional[str] = Field(default="")
+    permit: Optional[str] = Field(default="")
+    force_rport: str = Field(default="yes")
+    webrtc: str = Field(default="no")
+    moh_suggest: str = Field(default="default")
+    call_group: str = Field(default="1")
+    rtp_symmetric: str = Field(default="yes")
+    rtp_timeout: int = Field(default=30)
+    rtp_timeout_hold: int = Field(default=60)
+    rewrite_contact: str = Field(default="yes")
+    from_user: Optional[str] = Field(None)
+    from_domain: Optional[str] = Field(default="")
+    mailboxes: Optional[str] = Field(default="")
+    voicemail_extension: Optional[str] = Field(default="")
+    pickup_group: str = Field(default="1")
+    one_touch_recording: str = Field(default="yes")
+    record_on_feature: str = Field(default="*1")
+    record_off_feature: str = Field(default="*2")
+    record_calls: str = Field(default="yes")
+    allow_subscribe: str = Field(default="yes")
+    dtmf_mode: str = Field(default="rfc4733")
+    rel100: str = Field(default="no", alias="100rel")
+    ice_support: str = Field(default="no")
+    sdp_session: str = Field(default="Asterisk")
+    set_var: Optional[str] = Field(default="")
+    tone_zone: str = Field(default="us")
+    send_pai: str = Field(default="yes")
+    send_rpid: str = Field(default="yes")
     auth: AuthConfig
     aor: AORConfig
     created_at: Optional[str] = None
@@ -128,110 +161,86 @@ class AdvancedEndpoint(BaseModel):
         flat_dict = {
             'id': self.id,
             'type': self.type,
+            'context': self.context,
+            'disallow': self.disallow,
             'accountcode': self.accountcode,
+            'max_audio_streams': self.max_audio_streams,
+            'device_state_busy_at': self.device_state_busy_at,
+            'allow_transfer': self.allow_transfer,
+            'outbound_auth': self.outbound_auth,
+            'callerid': self.callerid,
+            'callerid_privacy': self.callerid_privacy,
+            'connected_line_method': self.connected_line_method,
+            'identify_by': self.identify_by,
+            'deny': self.deny,
+            'permit': self.permit,
+            'force_rport': self.force_rport,
+            'webrtc': self.webrtc,
+            'moh_suggest': self.moh_suggest,
+            'call_group': self.call_group,
+            'rtp_symmetric': self.rtp_symmetric,
+            'rtp_timeout': self.rtp_timeout,
+            'rtp_timeout_hold': self.rtp_timeout_hold,
+            'rewrite_contact': self.rewrite_contact,
+            'from_user': self.from_user,
+            'from_domain': self.from_domain,
+            'mailboxes': self.mailboxes,
+            'voicemail_extension': self.voicemail_extension,
+            'pickup_group': self.pickup_group,
+            'one_touch_recording': self.one_touch_recording,
+            'record_on_feature': self.record_on_feature,
+            'record_off_feature': self.record_off_feature,
+            'record_calls': self.record_calls,
+            'allow_subscribe': self.allow_subscribe,
+            'dtmf_mode': self.dtmf_mode,
+            '100rel': self.rel100,
+            'ice_support': self.ice_support,
+            'sdp_session': self.sdp_session,
+            'set_var': self.set_var,
+            'tone_zone': self.tone_zone,
+            'send_pai': self.send_pai,
+            'send_rpid': self.send_rpid,
             'auth': self.auth.model_dump(),
             'aor': self.aor.model_dump()
         }
-        for section in [self.audio_media, self.transport_network, self.rtp, 
-                        self.recording, self.call, self.presence, self.voicemail]:
-            flat_dict.update(section.model_dump())
+        
+        # Add transport_network fields
+        if self.transport_network:
+            flat_dict.update(self.transport_network.model_dump())
+            
+        # Add audio_media fields
+        if self.audio_media:
+            flat_dict.update(self.audio_media.model_dump())
+            
         return flat_dict
-
-class SimpleEndpoint(BaseModel):
-    """Simple endpoint configuration with basic settings"""
-    id: str
-    username: Optional[str] = None  # Optional since it can be in auth
-    password: str  # Required password
-    context: str = "internal"
-    codecs: List[str] = ["ulaw", "alaw"]
-    max_contacts: int = 1
-    callerid: Optional[str] = None
-    custom_data: Optional[Dict[str, Any]] = None
-    auth: Optional[AuthConfig] = None
-    aor: Optional[AORConfig] = None
-
-    @field_validator('username')
-    @classmethod
-    def validate_username(cls, v: Optional[str], info) -> Optional[str]:
-        """Validate username is provided either directly or in auth"""
-        values = info.data
-        if not v and not values.get('auth', {}).get('username'):
-            raise ValueError('username must be provided either directly or in auth object')
-        return v
-
-    @field_validator('password')
-    @classmethod
-    def validate_password(cls, v: str, info) -> str:
-        """Validate password is provided"""
-        if not v:
-            raise ValueError('password must be provided')
-        return v
-
-class EndpointCreate(BaseModel):
-    """Create endpoint - can use either simple or advanced format"""
-    simple: Optional[SimpleEndpoint] = None
-    advanced: Optional[AdvancedEndpoint] = None
-
-    def get_endpoint_data(self) -> Dict[str, Any]:
-        """Get endpoint data in unified format"""
-        if self.advanced:
-            return self.advanced.model_dump()
-        elif self.simple:
-            # Convert simple to advanced format
-            return {
-                'id': self.simple.id,
-                'name': self.simple.name or f"Extension {self.simple.id}",
-                'context': self.simple.context,
-                'allow': ','.join(self.simple.codecs),
-                'callerid': self.simple.callerid or "",
-                'auth': {
-                    'username': self.simple.username,
-                    'password': self.simple.password,
-                    'realm': 'UVLink'
-                },
-                'aor': {
-                    'max_contacts': self.simple.max_contacts
-                }
-            }
-        else:
-            raise ValueError("Either simple or advanced endpoint data must be provided")
 
 class EndpointUpdate(BaseModel):
     """Update endpoint configuration"""
-    context: Optional[str] = Field(None, pattern=r'^[a-zA-Z0-9_-]+$')
-    callerid: Optional[str] = Field(None, max_length=100)
-    allow: Optional[str] = Field(None)
-    transport: Optional[str] = Field(None)
-    webrtc: Optional[str] = Field(None, pattern=r'^(yes|no)$')
-    max_contacts: Optional[int] = Field(None, ge=1, le=10)
-    qualify_frequency: Optional[int] = Field(None, ge=0, le=300)
-    username: Optional[str] = Field(None, min_length=1, max_length=50)
-    password: Optional[str] = Field(None, min_length=8, max_length=128)
-    realm: Optional[str] = Field(None, max_length=100)
-
-class BulkEndpointCreate(BaseModel):
-    """Create multiple endpoints at once"""
-    endpoints: List[Union[SimpleEndpoint, AdvancedEndpoint]]
-    overwrite_existing: bool = Field(default=False)
+    id: Optional[str] = Field(None, min_length=1, max_length=50, pattern=r'^[a-zA-Z0-9_-]+$')
+    type: Optional[str] = Field(None)
+    accountcode: Optional[str] = Field(None, max_length=20)
+    audio_media: Optional[AudioMediaSettings] = None
+    transport_network: Optional[TransportNetworkSettings] = None
+    rtp: Optional[RTPSettings] = None
+    recording: Optional[RecordingSettings] = None
+    call: Optional[CallSettings] = None
+    presence: Optional[PresenceSettings] = None
+    voicemail: Optional[VoicemailSettings] = None
+    auth: Optional[AuthConfig] = None
+    aor: Optional[AORConfig] = None
 
 # Response models
-class EndpointListResponse(BaseModel):
-    """Response model for listing endpoints with organized sections"""
-    success: bool
-    count: int
-    endpoints: List[Dict[str, Any]]
-
 class StatusResponse(BaseModel):
     """Generic status response"""
     success: bool
     message: str
     details: Optional[Dict[str, Any]] = None
 
-class ReloadResponse(BaseModel):
-    """Response for reload operations"""
+class EndpointListResponse(BaseModel):
+    """Response model for listing endpoints"""
     success: bool
-    message: str
-    output: Optional[str] = None
+    count: int
+    endpoints: List[Dict[str, Any]]
 
 class ConfigResponse(BaseModel):
     """Response for configuration operations"""
@@ -245,12 +254,3 @@ class EndpointValidation(BaseModel):
     exists: bool
     available: bool
     conflicts: Optional[List[str]] = None
-
-# Legacy compatibility
-class Endpoint(SimpleEndpoint):
-    """Legacy endpoint model for backward compatibility"""
-    pass
-
-class EndpointsList(BaseModel):
-    """Legacy endpoints list for backward compatibility"""
-    endpoints: List[SimpleEndpoint]

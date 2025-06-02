@@ -8,8 +8,7 @@ from fastapi import HTTPException
 
 
 from .schemas import (
-    AdvancedEndpoint, SimpleEndpoint, EndpointCreate, EndpointUpdate,
-    BulkEndpointCreate
+    AdvancedEndpoint, EndpointUpdate
 )
 from .config_parser import AdvancedPJSIPConfigParser
 from shared.utils import execute_asterisk_command
@@ -156,6 +155,22 @@ class AdvancedEndpointService:
                 'callerid': endpoint_data.get('callerid', ''),
             }
             
+            # Handle transport_network fields
+            if 'transport_network' in endpoint_data:
+                transport_data = endpoint_data['transport_network']
+                for key, value in transport_data.items():
+                    if value is not None:
+                        flat_data[key] = value
+                logger.info(f"Added transport_network data: {transport_data}")
+            
+            # Handle audio_media fields
+            if 'audio_media' in endpoint_data:
+                audio_data = endpoint_data['audio_media']
+                for key, value in audio_data.items():
+                    if value is not None:
+                        flat_data[key] = value
+                logger.info(f"Added audio_media data: {audio_data}")
+            
             # Add custom data if present
             if 'custom_data' in endpoint_data and endpoint_data['custom_data']:
                 flat_data['custom_data'] = {
@@ -188,7 +203,7 @@ class AdvancedEndpointService:
             
             # Add any additional fields
             for key, value in endpoint_data.items():
-                if key not in ['id', 'type', 'auth', 'aor', 'custom_data'] and value is not None:
+                if key not in ['id', 'type', 'auth', 'aor', 'custom_data', 'transport_network', 'audio_media'] and value is not None:
                     flat_data[key] = value
             
             logger.info(f"Final flat data: {flat_data}")
@@ -201,182 +216,52 @@ class AdvancedEndpointService:
             return False
     
     @staticmethod
-    def add_simple_endpoint(endpoint_data: SimpleEndpoint) -> bool:
-        """Add a simple endpoint"""
+    def update_endpoint(endpoint_id: str, endpoint_data: EndpointUpdate) -> tuple[bool, str]:
+        """Update an existing endpoint"""
         try:
-            # Convert simple endpoint to advanced format
-            advanced_data = {
-                "id": endpoint_data.id,
-                "type": "endpoint",
-                "context": "internal",
-                "allow": "ulaw,alaw",
-                "callerid": "",
-                "auth": {
-                    "type": "auth",
-                    "auth_type": "userpass",
-                    "username": endpoint_data.id,
-                    "password": endpoint_data.password,  # Use the password from the request
-                    "realm": "UVLink"
-                },
-                "aor": {
-                    "type": "aor",
-                    "max_contacts": 1
-                },
-                "custom_data": {
-                    "name": f"Extension {endpoint_data.id}"
-                }
-            }
+            parser = AdvancedEndpointService.get_parser()
+            # Convert the update data to a dictionary
+            update_dict = endpoint_data.model_dump(exclude_unset=True)
             
-            logger.info(f"Converting simple endpoint to advanced format: {advanced_data}")
+            # Always set old_id to the current endpoint_id from the URL
+            update_dict['old_id'] = endpoint_id
             
-            # Add endpoint using parser
-            parser = AdvancedPJSIPConfigParser(ASTERISK_PJSIP_CONFIG)
-            success = parser.add_endpoint_efficient(advanced_data)
-            
-            if not success:
-                raise HTTPException(status_code=400, detail="Failed to add endpoint")
-            
-            return {"message": "Endpoint added successfully", "endpoint": advanced_data}
-            
-        except Exception as e:
-            logger.error(f"Error adding simple endpoint: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
-    
-    @staticmethod
-    def add_bulk_endpoints(bulk_data: BulkEndpointCreate) -> Dict[str, Any]:
-        """Add multiple endpoints at once"""
-        parser = AdvancedEndpointService.get_parser()
-        
-        results = {
-            'success': [],
-            'failed': [],
-            'skipped': []
-        }
-        
-        for endpoint in bulk_data.endpoints:
-            endpoint_id = endpoint.id
-            
-            # Check if exists and handle accordingly
-            if endpoint_id in parser.sections:
-                if bulk_data.overwrite_existing:
-                    # Delete existing first
-                    parser.delete_endpoint(endpoint_id)
-                else:
-                    results['skipped'].append({
-                        'id': endpoint_id,
-                        'reason': 'Already exists'
-                    })
-                    continue
-            
-            # Convert to advanced format
-            if isinstance(endpoint, SimpleEndpoint):
-                advanced_data = {
-                    'id': endpoint.id,
-                    'name': endpoint.name or f"Extension {endpoint.id}",
-                    'context': endpoint.context,
-                    'allow': ','.join(endpoint.codecs),
-                    'callerid': endpoint.callerid or "",
-                    'auth': {
-                        'id': endpoint.id,  # Use same ID as endpoint
-                        'username': endpoint.username,
-                        'password': endpoint.password,
-                        'realm': 'UVLink'
-                    },
-                    'aor': {
-                        'id': endpoint.id,  # Use same ID as endpoint
-                        'max_contacts': endpoint.max_contacts
-                    }
-                }
-            else:  # AdvancedEndpoint
-                advanced_data = endpoint.model_dump()
-                # Ensure auth and aor use same ID
-                if 'auth' in advanced_data:
-                    advanced_data['auth']['id'] = endpoint_id
-                if 'aor' in advanced_data:
-                    advanced_data['aor']['id'] = endpoint_id
-            
-            # Try to add
-            if parser.add_advanced_endpoint(advanced_data):
-                results['success'].append(endpoint_id)
+            # If no new ID is provided in the update data, use the URL endpoint_id
+            if 'id' not in update_dict:
+                update_dict['id'] = endpoint_id
             else:
-                results['failed'].append({
-                    'id': endpoint_id,
-                    'reason': 'Failed to add'
-                })
-        
-        # Save if any were successful
-        if results['success']:
-            parser.save(backup_suffix="bulk_add_endpoints")
-        
-        return results
-    
-    @staticmethod
-    def update_endpoint(endpoint_id: str, endpoint_data: EndpointUpdate) -> bool:
-        """Update an existing endpoint - requires full parsing"""
-        parser = AdvancedEndpointService.get_parser()  # This will parse the entire file
-        
-        # Build update data
-        update_data = {'id': endpoint_id}
-        
-        # Add provided fields
-        if endpoint_data.context is not None:
-            update_data['context'] = endpoint_data.context
-        if endpoint_data.callerid is not None:
-            update_data['callerid'] = endpoint_data.callerid
-        if endpoint_data.allow is not None:
-            update_data['allow'] = endpoint_data.allow
-        if endpoint_data.transport is not None:
-            update_data['transport'] = endpoint_data.transport
-        if endpoint_data.webrtc is not None:
-            update_data['webrtc'] = endpoint_data.webrtc
-        
-        # Handle auth updates
-        if endpoint_data.username or endpoint_data.password or endpoint_data.realm:
-            auth_data = {}
-            if endpoint_data.username:
-                auth_data['username'] = endpoint_data.username
-            if endpoint_data.password:
-                auth_data['password'] = endpoint_data.password
-            if endpoint_data.realm:
-                auth_data['realm'] = endpoint_data.realm
-            update_data['auth'] = auth_data
-        
-        # Handle AOR updates
-        if endpoint_data.max_contacts or endpoint_data.qualify_frequency:
-            aor_data = {}
-            if endpoint_data.max_contacts:
-                aor_data['max_contacts'] = endpoint_data.max_contacts
-            if endpoint_data.qualify_frequency:
-                aor_data['qualify_frequency'] = endpoint_data.qualify_frequency
-            update_data['aor'] = aor_data
-        
-        if parser.update_endpoint(update_data):
-            return parser.save(backup_suffix="update_endpoint")
-        
-        return False
+                logger.info(f"Changing endpoint ID from {endpoint_id} to {update_dict['id']}")
+                
+            logger.info(f"Updating endpoint with data: {update_dict}")
+            
+            # Check if the endpoint exists before trying to update
+            if not parser.sections.get((endpoint_id, 'endpoint-tpl')):
+                return False, f"Endpoint {endpoint_id} does not exist"
+                
+            return parser.update_endpoint(update_dict), "Endpoint updated successfully"
+        except Exception as e:
+            logger.error(f"Failed to update endpoint: {e}")
+            return False, str(e)
     
     @staticmethod
     def delete_endpoint(endpoint_id: str) -> bool:
-        """Delete an endpoint safely - requires full parsing"""
-        parser = AdvancedEndpointService.get_parser()  # This will parse the entire file
-        
-        if parser.delete_endpoint(endpoint_id):
-            return parser.save(backup_suffix="delete_endpoint")
-        
-        return False
+        """Delete an endpoint"""
+        try:
+            parser = AdvancedEndpointService.get_parser()
+            return parser.delete_endpoint(endpoint_id)
+        except Exception as e:
+            logger.error(f"Failed to delete endpoint: {e}")
+            return False
     
     @staticmethod
     def get_current_config() -> str:
         """Get current PJSIP configuration"""
         try:
-            if os.path.exists(ASTERISK_PJSIP_CONFIG):
-                with open(ASTERISK_PJSIP_CONFIG, 'r') as f:
-                    return f.read()
-            else:
-                return "; No configuration file found"
+            with open(ASTERISK_PJSIP_CONFIG, 'r') as f:
+                return f.read()
         except Exception as e:
-            logger.error(f"Failed to read config: {e}")
-            return f"; Error reading config: {e}"
+            logger.error(f"Failed to read config file: {e}")
+            return ""
     
     @staticmethod
     def reload_pjsip() -> tuple[bool, str]:
@@ -386,144 +271,54 @@ class AdvancedEndpointService:
     @staticmethod
     def validate_endpoint_data(endpoint_json: Dict[str, Any]) -> Dict[str, Any]:
         """Validate endpoint data before adding"""
-        errors = []
-        warnings = []
-        
-        # Required fields
-        required_fields = ['id']
-        for field in required_fields:
-            if field not in endpoint_json or not endpoint_json[field]:
-                errors.append(f"Missing required field: {field}")
-        
-        # Validate ID format
-        if 'id' in endpoint_json:
-            if not re.match(r'^[a-zA-Z0-9_-]+$', endpoint_json['id']):
-                errors.append("ID must contain only letters, numbers, underscores, and hyphens")
-        
-        # Validate sections
-        sections = {
-            'audio_media': {
-                'max_audio_streams': (int, 1, 10),
-                'allow': (str, None, None),
-                'disallow': (str, None, None),
-                'moh_suggest': (str, None, None),
-                'tone_zone': (str, None, None),
-                'dtmf_mode': (str, None, None),
-                'allow_transfer': (str, ['yes', 'no'])
-            },
-            'transport_network': {
-                'transport': (str, None, None),
-                'identify_by': (str, None, None),
-                'force_rport': (str, ['yes', 'no']),
-                'rewrite_contact': (str, ['yes', 'no']),
-                'direct_media': (str, ['yes', 'no']),
-                'ice_support': (str, ['yes', 'no']),
-                'webrtc': (str, ['yes', 'no'])
-            },
-            'rtp': {
-                'rtp_symmetric': (str, ['yes', 'no']),
-                'rtp_timeout': (int, 0, 300),
-                'rtp_timeout_hold': (int, 0, 3600),
-                'sdp_session': (str, None, None)
-            },
-            'recording': {
-                'record_calls': (str, ['yes', 'no']),
-                'one_touch_recording': (str, ['yes', 'no']),
-                'record_on_feature': (str, None, None),
-                'record_off_feature': (str, None, None)
-            },
-            'call': {
-                'context': (str, None, None),
-                'callerid': (str, None, None),
-                'callerid_privacy': (str, None, None),
-                'connected_line_method': (str, None, None),
-                'call_group': (str, None, None),
-                'pickup_group': (str, None, None),
-                'device_state_busy_at': (int, 1, 10)
-            },
-            'presence': {
-                'allow_subscribe': (str, ['yes', 'no']),
-                'send_pai': (str, ['yes', 'no']),
-                'send_rpid': (str, ['yes', 'no']),
-                '100rel': (str, ['yes', 'no'])
-            }
-        }
-        
-        # Validate each section
-        for section_name, section_fields in sections.items():
-            if section_name in endpoint_json:
-                section_data = endpoint_json[section_name]
-                for field_name, (field_type, min_val, max_val) in section_fields.items():
-                    if field_name in section_data:
-                        value = section_data[field_name]
-                        
-                        # Type validation
-                        if not isinstance(value, field_type):
-                            errors.append(f"{section_name}.{field_name} must be of type {field_type.__name__}")
-                            continue
-                        
-                        # Range validation for numbers
-                        if field_type == int and min_val is not None and max_val is not None:
-                            if not min_val <= value <= max_val:
-                                errors.append(f"{section_name}.{field_name} must be between {min_val} and {max_val}")
-                        
-                        # Enum validation for strings
-                        if field_type == str and isinstance(min_val, list):
-                            if value not in min_val:
-                                errors.append(f"{section_name}.{field_name} must be one of {min_val}")
-        
-        # Validate auth section
-        if 'auth' in endpoint_json:
+        try:
+            # Validate required fields
+            if 'id' not in endpoint_json:
+                return {
+                    'valid': False,
+                    'errors': ['Missing required field: id']
+                }
+            
+            # Validate auth section
+            if 'auth' not in endpoint_json:
+                return {
+                    'valid': False,
+                    'errors': ['Missing required section: auth']
+                }
+            
             auth = endpoint_json['auth']
-            if not auth.get('username'):
-                errors.append("Auth username is required")
-            if not auth.get('password'):
-                errors.append("Auth password is required")
-            if auth.get('username') and len(auth['username']) > 50:
-                errors.append("Auth username must be 50 characters or less")
-            if auth.get('password') and len(auth['password']) > 128:
-                errors.append("Auth password must be 128 characters or less")
-        else:
-            errors.append("Auth configuration is required")
-        
-        # Validate AOR section
-        if 'aor' in endpoint_json:
-            aor = endpoint_json['aor']
-            if 'max_contacts' in aor:
-                try:
-                    max_contacts = int(aor['max_contacts'])
-                    if not 1 <= max_contacts <= 10:
-                        errors.append("AOR max_contacts must be between 1 and 10")
-                except ValueError:
-                    errors.append("AOR max_contacts must be a number")
-            if 'qualify_frequency' in aor:
-                try:
-                    qualify_freq = int(aor['qualify_frequency'])
-                    if not 0 <= qualify_freq <= 300:
-                        errors.append("AOR qualify_frequency must be between 0 and 300")
-                except ValueError:
-                    errors.append("AOR qualify_frequency must be a number")
-        else:
-            errors.append("AOR configuration is required")
-        
-        # Validate codecs
-        if 'audio_media' in endpoint_json and 'allow' in endpoint_json['audio_media']:
-            allowed_codecs = ['ulaw', 'alaw', 'g722', 'g729', 'gsm', 'opus', 'h264', 'vp8', 'vp9']
-            codecs = [c.strip() for c in endpoint_json['audio_media']['allow'].split(',')]
-            for codec in codecs:
-                if codec not in allowed_codecs and codec != 'all':
-                    warnings.append(f"Unknown codec: {codec}")
-        
-        # Check if endpoint exists
-        existing = AdvancedEndpointService.get_endpoint(endpoint_json['id'])
-        if existing:
-            warnings.append(f"Endpoint {endpoint_json['id']} already exists")
-        
-        return {
-            'valid': len(errors) == 0,
-            'errors': errors,
-            'warnings': warnings
-        }
+            if 'password' not in auth:
+                return {
+                    'valid': False,
+                    'errors': ['Missing required field: auth.password']
+                }
+            
+            # Validate AOR section
+            if 'aor' not in endpoint_json:
+                return {
+                    'valid': False,
+                    'errors': ['Missing required section: aor']
+                }
+            
+            # Check for duplicate endpoint ID
+            parser = AdvancedEndpointService.get_parser()
+            if endpoint_json['id'] in parser.sections:
+                return {
+                    'valid': False,
+                    'errors': [f"Endpoint ID '{endpoint_json['id']}' already exists"]
+                }
+            
+            return {
+                'valid': True,
+                'warnings': []
+            }
+            
+        except Exception as e:
+            logger.error(f"Validation error: {e}")
+            return {
+                'valid': False,
+                'errors': [str(e)]
+            }
     
     @staticmethod
     def export_endpoints_to_json() -> List[Dict[str, Any]]:
