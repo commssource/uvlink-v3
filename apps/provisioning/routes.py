@@ -25,10 +25,7 @@ logger = logging.getLogger(__name__)
 # API v1 router for provisioning management
 router = APIRouter(prefix="/api/v1/provisioning", tags=["provisioning"])
 
-# Root router for phone configuration access
-config_router = APIRouter(prefix="/provisioning", tags=["phone-config"])
-
-# New router for authenticated configuration access
+# Router for authenticated configuration access
 prov_router = APIRouter(prefix="/prov", tags=["phone-config"])
 
 security = HTTPBasic()
@@ -217,18 +214,54 @@ async def get_provisioning(mac_address: str, db: Session = Depends(get_db)):
     return provisioning
 
 @router.get("/", response_model=List[ProvisioningResponse])
-async def list_provisioning(db: Session = Depends(get_db)):
+async def list_provisioning(
+    make: Optional[str] = None,
+    model: Optional[str] = None,
+    approved: Optional[bool] = None,
+    page: int = 1,
+    limit: int = 10,
+    db: Session = Depends(get_db)
+):
+    """
+    List provisioning entries with optional filtering and pagination.
+    
+    Parameters:
+    - make: Filter by phone make (e.g., 'yealink')
+    - model: Filter by phone model (e.g., 'T48S')
+    - approved: Filter by approval status
+    - page: Page number (default: 1)
+    - limit: Number of items per page (default: 10)
+    """
     try:
-        logger.info("Fetching all provisioning records")
-        records = db.query(Provisioning).all()
-        logger.info(f"Found {len(records)} records")
-        return records
+        # Start with base query
+        query = db.query(Provisioning)
+        
+        # Apply filters if provided
+        if make:
+            query = query.filter(Provisioning.make.ilike(f"%{make}%"))
+        if model:
+            query = query.filter(Provisioning.model.ilike(f"%{model}%"))
+        if approved is not None:
+            query = query.filter(Provisioning.approved == approved)
+        
+        # Calculate pagination
+        total = query.count()
+        skip = (page - 1) * limit
+        
+        # Apply pagination
+        query = query.offset(skip).limit(limit)
+        
+        # Execute query
+        items = query.all()
+        
+        return items
+        
     except Exception as e:
-        logger.error(f"Error fetching provisioning records: {str(e)}")
+        logger.error(f"Error listing provisioning entries: {str(e)}")
         logger.error(traceback.format_exc())
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to fetch provisioning records: {str(e)}"
+            detail=f"Error listing provisioning entries: {str(e)}"
         )
 
 @router.put("/{mac_address}", response_model=ProvisioningResponse)
@@ -359,8 +392,8 @@ async def get_storage_files(mac_address: str):
 
     return result
 
-# Phone configuration endpoints
-@config_router.get("/{mac_address}.cfg")
+# Move all config_router endpoints to prov_router
+@prov_router.get("/{mac_address}.cfg")
 async def get_phone_config(mac_address: str, db: Session = Depends(get_db)):
     provisioning = db.query(Provisioning).filter(Provisioning.mac_address == mac_address).first()
     if not provisioning:
@@ -380,7 +413,7 @@ async def get_phone_config(mac_address: str, db: Session = Depends(get_db)):
             raise HTTPException(status_code=500, detail=str(e))
     raise HTTPException(status_code=400, detail="Unsupported phone make")
 
-@config_router.get("/{mac_address}.boot")
+@prov_router.get("/{mac_address}.boot")
 async def get_phone_boot(mac_address: str, db: Session = Depends(get_db)):
     provisioning = db.query(Provisioning).filter(Provisioning.mac_address == mac_address).first()
     if not provisioning:
@@ -397,7 +430,7 @@ async def get_phone_boot(mac_address: str, db: Session = Depends(get_db)):
             raise HTTPException(status_code=500, detail=str(e))
     raise HTTPException(status_code=400, detail="Unsupported phone make")
 
-@config_router.get("/y000000000000.cfg")
+@prov_router.get("/y000000000000.cfg")
 async def get_y000_config(db: Session = Depends(get_db)):
     # This endpoint will return the default Yealink configuration
     try:

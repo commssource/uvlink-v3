@@ -244,6 +244,9 @@ class EndpointListResponse(BaseModel):
     success: bool
     count: int
     endpoints: List[Dict[str, Any]]
+    page: int
+    limit: int
+    total_pages: int
 
 class ConfigResponse(BaseModel):
     """Response for configuration operations"""

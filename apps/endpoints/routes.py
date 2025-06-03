@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
-from typing import List, Dict, Any, Union
+from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Query
+from typing import List, Dict, Any, Union, Optional
 import json
 
 from .schemas import (
@@ -16,14 +16,86 @@ router = APIRouter(prefix="/api/v1/endpoints", tags=["endpoints"])
 
 
 @router.get("/", response_model=EndpointListResponse)
-async def list_endpoints(auth: Union[str, dict] = Depends(verify_auth)):
-    """List all endpoints from current configuration"""
+async def list_endpoints(
+    auth: Union[str, dict] = Depends(verify_auth),
+    page: int = Query(1, ge=1, description="Page number"),
+    limit: int = Query(10, ge=1, le=100, description="Number of items per page"),
+    search: Optional[str] = Query(None, description="Search in endpoint ID and username"),
+    context: Optional[str] = Query(None, description="Filter by context"),
+    transport: Optional[str] = Query(None, description="Filter by transport type"),
+    webrtc: Optional[bool] = Query(None, description="Filter by WebRTC support"),
+    sort_by: Optional[str] = Query("id", description="Sort by field (id, created_at, updated_at)"),
+    sort_order: Optional[str] = Query("asc", description="Sort order (asc or desc)")
+):
+    """
+    List all endpoints with pagination and filtering options.
+    
+    Parameters:
+    - page: Page number (default: 1)
+    - limit: Items per page (default: 10, max: 100)
+    - search: Search in endpoint ID and username
+    - context: Filter by context
+    - transport: Filter by transport type
+    - webrtc: Filter by WebRTC support
+    - sort_by: Sort by field (id, created_at, updated_at)
+    - sort_order: Sort order (asc or desc)
+    """
     try:
-        endpoints = AdvancedEndpointService.list_endpoints()
+        # Get all endpoints
+        all_endpoints = AdvancedEndpointService.list_endpoints()
+        
+        # Apply filters
+        filtered_endpoints = all_endpoints
+        
+        if search:
+            search = search.lower()
+            filtered_endpoints = [
+                ep for ep in filtered_endpoints
+                if search in ep.get('id', '').lower() or 
+                   search in ep.get('auth', {}).get('username', '').lower()
+            ]
+        
+        if context:
+            filtered_endpoints = [
+                ep for ep in filtered_endpoints
+                if ep.get('context') == context
+            ]
+        
+        if transport:
+            filtered_endpoints = [
+                ep for ep in filtered_endpoints
+                if ep.get('transport_network', {}).get('transport') == transport
+            ]
+        
+        if webrtc is not None:
+            filtered_endpoints = [
+                ep for ep in filtered_endpoints
+                if ep.get('webrtc', '').lower() == str(webrtc).lower()
+            ]
+        
+        # Apply sorting
+        if sort_by in ['id', 'created_at', 'updated_at']:
+            reverse = sort_order.lower() == 'desc'
+            filtered_endpoints.sort(
+                key=lambda x: x.get(sort_by, ''),
+                reverse=reverse
+            )
+        
+        # Calculate pagination
+        total = len(filtered_endpoints)
+        start = (page - 1) * limit
+        end = start + limit
+        
+        # Get paginated results
+        paginated_endpoints = filtered_endpoints[start:end]
+        
         return EndpointListResponse(
             success=True,
-            count=len(endpoints),
-            endpoints=endpoints
+            count=total,
+            endpoints=paginated_endpoints,
+            page=page,
+            limit=limit,
+            total_pages=(total + limit - 1) // limit
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
