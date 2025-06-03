@@ -15,6 +15,13 @@ load_dotenv()
 APP_NAME = "UVLink Platform"
 APP_VERSION = "1.2.0"
 APP_DESCRIPTION = "Dashboard for managing UVLink"
+BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
+
+# Azure Storage configuration
+AZURE_STORAGE_CONNECTION_STRING = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
+AZURE_STORAGE_CONTAINER = os.getenv("AZURE_STORAGE_CONTAINER", "provisioning")
+AZURE_STORAGE_ACCOUNT_NAME = os.getenv("AZURE_STORAGE_ACCOUNT_NAME")
+AZURE_STORAGE_ACCOUNT_KEY = os.getenv("AZURE_STORAGE_ACCOUNT_KEY")
 
 # Asterisk configuration
 ASTERISK_CONFIG_PATH = os.getenv("ASTERISK_CONFIG_PATH")

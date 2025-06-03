@@ -18,6 +18,7 @@ endpoint:
   dtmf_mode: rfc4733
   allow: alaw
   use_ptime: no
+  set_var: ""
   callerid: ""
 
 auth:

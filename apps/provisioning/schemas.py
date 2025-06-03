@@ -1,0 +1,81 @@
+from pydantic import BaseModel, Field
+from datetime import datetime
+from typing import Optional
+from zoneinfo import ZoneInfo
+
+class ProvisioningBase(BaseModel):
+    endpoint: str = Field(..., description="Endpoint ID")
+    make: str = Field(..., description="Phone make (e.g., yealink)")
+    model: str = Field(..., description="Phone model (e.g., T48S)")
+    mac_address: str = Field(..., description="12-character MAC address")
+    status: bool = Field(True, description="Provisioning status")
+
+class ProvisioningCreate(ProvisioningBase):
+    pass
+
+class ProvisioningUpdate(BaseModel):
+    endpoint: Optional[str] = Field(None, description="Endpoint ID")
+    make: Optional[str] = Field(None, description="Phone make (e.g., yealink)")
+    model: Optional[str] = Field(None, description="Phone model (e.g., T48S)")
+    mac_address: Optional[str] = Field(None, description="12-character MAC address")
+    username: Optional[str] = Field(None, description="Username")
+    password: Optional[str] = Field(None, description="Password")
+    updated_at: Optional[datetime] = Field(None, description="Last update timestamp")
+    status: Optional[bool] = Field(None, description="Provisioning status")
+
+class Provisioning(ProvisioningBase):
+    id: int
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        orm_mode = True
+        schema_extra = {
+            "example": {
+                "endpoint": "201",
+                "make": "yealink",
+                "model": "T48S",
+                "mac_address": "0015651234AP",
+                "status": True
+            }
+        }
+
+class ProvisioningResponse(BaseModel):
+    id: int
+    endpoint: str
+    make: str
+    model: str
+    mac_address: str
+    status: bool
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    approved: Optional[bool] = False
+    provisioning_request: Optional[str]
+    ip_address: Optional[str]
+    provisioning_status: Optional[str]
+    last_provisioning_attempt: Optional[datetime]
+    request_date: Optional[datetime]
+
+    class Config:
+        from_attributes = True
+        json_encoders = {
+            datetime: lambda dt: dt.isoformat() if dt else None
+        }
+
+    def model_post_init(self, __context):
+        """Convert UTC times to local timezone after model initialization"""
+        uk_tz = ZoneInfo("Europe/London")
+        
+        def convert_to_uk_time(dt: Optional[datetime]) -> Optional[datetime]:
+            if dt is None:
+                return None
+            # If datetime is naive (no timezone), assume it's UTC
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=ZoneInfo("UTC"))
+            return dt.astimezone(uk_tz)
+        
+        # Convert all datetime fields to UK time
+        self.created_at = convert_to_uk_time(self.created_at)
+        self.updated_at = convert_to_uk_time(self.updated_at)
+        self.last_provisioning_attempt = convert_to_uk_time(self.last_provisioning_attempt)
+        self.request_date = convert_to_uk_time(self.request_date) 

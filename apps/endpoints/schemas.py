@@ -109,6 +109,7 @@ class AdvancedEndpoint(BaseModel):
     context: str = Field(default="internal")
     disallow: str = Field(default="all")
     accountcode: Optional[str] = Field(None, max_length=20)
+    set_var: Optional[str] = Field(default="")
     max_audio_streams: int = Field(default=2)
     device_state_busy_at: int = Field(default=2)
     allow_transfer: str = Field(default="yes")
@@ -164,6 +165,7 @@ class AdvancedEndpoint(BaseModel):
             'context': self.context,
             'disallow': self.disallow,
             'accountcode': self.accountcode,
+            "set_var": self.set_var,
             'max_audio_streams': self.max_audio_streams,
             'device_state_busy_at': self.device_state_busy_at,
             'allow_transfer': self.allow_transfer,
@@ -219,6 +221,7 @@ class EndpointUpdate(BaseModel):
     id: Optional[str] = Field(None, min_length=1, max_length=50, pattern=r'^[a-zA-Z0-9_-]+$')
     type: Optional[str] = Field(None)
     accountcode: Optional[str] = Field(None, max_length=20)
+    set_var: Optional[str] = Field(None, max_length=20)
     audio_media: Optional[AudioMediaSettings] = None
     transport_network: Optional[TransportNetworkSettings] = None
     rtp: Optional[RTPSettings] = None

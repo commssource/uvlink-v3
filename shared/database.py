@@ -58,10 +58,21 @@ def get_db() -> Session:
     finally:
         db.close()
 
+def import_models():
+    """Import all models to ensure they are included in Base.metadata"""
+    try:
+        from apps.provisioning.models import Provisioning  # Updated import path
+        logger.info("✅ Provisioning model imported successfully")
+    except ImportError as e:
+        logger.warning(f"⚠️ Could not import Provisioning model: {e}")
+
 # Initialize database
 def init_database():
-    """Initialize database tables"""
+    """Initialize the database and create tables"""
     try:
+        # Import models here to ensure they are registered with Base
+        import_models()
+        
         # Test connection first
         with engine.connect() as connection:
             logger.info("✅ Database connection successful")
@@ -72,6 +83,6 @@ def init_database():
         return True
         
     except Exception as e:
-        logger.error(f"❌ Database initialization failed: {e}")
+        logger.error(f"❌ Database initialization error: {str(e)}")
         print(f"❌ Database error: {e}")
         return False

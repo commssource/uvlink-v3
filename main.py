@@ -18,6 +18,7 @@ from shared.database import init_database
 # Import routers
 from apps.endpoints.routes import router as endpoints_router
 from shared.auth.routes import router as auth_router
+from apps.provisioning.routes import router as provisioning_router, config_router, prov_router
 
 # Setup logging
 logging.basicConfig(level=getattr(logging, LOG_LEVEL.upper()))
@@ -59,9 +60,13 @@ try:
     # Include routers
     app.include_router(endpoints_router)
     app.include_router(auth_router)
+    app.include_router(provisioning_router, tags=["provisioning"])
+    app.include_router(config_router)
+    app.include_router(prov_router)
     
     logger.info("✅ Endpoints app loaded")
     logger.info("✅ Auth app loaded")
+    logger.info("✅ Provisioning app loaded")
 except ImportError as e:
     logger.error(f"❌ Failed to load apps: {e}")
 

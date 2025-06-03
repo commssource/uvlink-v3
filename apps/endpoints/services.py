@@ -31,20 +31,39 @@ class AdvancedEndpointService:
     @staticmethod
     def _build_organized_endpoint(endpoint: Dict[str, Any], parser: AdvancedPJSIPConfigParser) -> Dict[str, Any]:
         """Helper method to build organized endpoint data"""
-        # Get auth section data by checking section type
+        # Get auth and aor section data by checking section type
         auth_data = {}
+        aor_data = {}
         for section_name, section_data in parser.sections.items():
-            if section_data.get('type') == 'auth':
+            # section_name is a tuple (name, type)
+            if section_data.get('type') == 'auth' and section_name[0] == endpoint['id']:
                 auth_data = section_data
-                break
+            elif section_data.get('type') == 'aor' and section_name[0] == endpoint['id']:
+                aor_data = section_data
+        
+        # Get the auth section directly from the parser
+        auth_section = parser.sections.get((f"{endpoint['id']}-auth", 'auth'))
+        if auth_section:
+            auth_data = auth_section
+        
+        def safe_int(value, default=0):
+            """Safely convert a value to integer"""
+            if value is None:
+                return default
+            try:
+                # Try to convert to int, if it fails return default
+                return int(str(value).split()[0])  # Take first word if multiple words
+            except (ValueError, TypeError):
+                return default
         
         return {
             'id': endpoint['id'],
             'type': endpoint['type'],
             'accountcode': endpoint.get('accountcode'),
+            'set_var': endpoint.get('set_var', ''),
             
             'audio_media': {
-                'max_audio_streams': int(endpoint.get('max_audio_streams', 2)),
+                'max_audio_streams': safe_int(endpoint.get('max_audio_streams'), 2),
                 'allow': endpoint.get('allow', 'ulaw,alaw'),
                 'disallow': endpoint.get('disallow', 'all'),
                 'moh_suggest': endpoint.get('moh_suggest', 'default'),
@@ -69,8 +88,8 @@ class AdvancedEndpointService:
             
             'rtp': {
                 'rtp_symmetric': endpoint.get('rtp_symmetric', 'yes'),
-                'rtp_timeout': int(endpoint.get('rtp_timeout', 30)),
-                'rtp_timeout_hold': int(endpoint.get('rtp_timeout_hold', 60)),
+                'rtp_timeout': safe_int(endpoint.get('rtp_timeout'), 30),
+                'rtp_timeout_hold': safe_int(endpoint.get('rtp_timeout_hold'), 60),
                 'sdp_session': endpoint.get('sdp_session', 'Asterisk')
             },
             
@@ -88,7 +107,7 @@ class AdvancedEndpointService:
                 'connected_line_method': endpoint.get('connected_line_method', 'invite'),
                 'call_group': endpoint.get('call_group', '1'),
                 'pickup_group': endpoint.get('pickup_group', '1'),
-                'device_state_busy_at': int(endpoint.get('device_state_busy_at', 2))
+                'device_state_busy_at': safe_int(endpoint.get('device_state_busy_at'), 2)
             },
             
             'presence': {
@@ -105,13 +124,22 @@ class AdvancedEndpointService:
             
             'auth': {
                 'type': 'auth',
-                'auth_type': 'userpass',
+                'auth_type': auth_data.get('auth_type', 'userpass'),
                 'username': auth_data.get('username', endpoint['id']),
-                'password': auth_data.get('password', ''),
+                'password': auth_data.get('password', 'Cs3244EG*01'),
                 'realm': auth_data.get('realm', 'UVLink')
             },
             
-            'aor': endpoint.get('aor', {})
+            'aor': {
+                'type': 'aor',
+                'max_contacts': safe_int(aor_data.get('max_contacts'), 1),
+                'qualify_timeout': safe_int(aor_data.get('qualify_timeout'), 8),
+                'qualify_frequency': safe_int(aor_data.get('qualify_frequency'), 60),
+                'authenticate_qualify': aor_data.get('authenticate_qualify', 'no'),
+                'default_expiration': safe_int(aor_data.get('default_expiration'), 360),
+                'minimum_expiration': safe_int(aor_data.get('minimum_expiration'), 120),
+                'maximum_expiration': safe_int(aor_data.get('maximum_expiration'), 300)
+            }
         }
     
     @staticmethod
@@ -153,6 +181,7 @@ class AdvancedEndpointService:
                 'context': endpoint_data.get('context', 'internal'),
                 'allow': endpoint_data.get('allow', 'ulaw,alaw'),
                 'callerid': endpoint_data.get('callerid', ''),
+                'set_var': endpoint_data.get('set_var', ''),
             }
             
             # Handle transport_network fields
@@ -390,6 +419,7 @@ class AdvancedEndpointService:
                 'context': endpoint_data.get('context', 'internal'),
                 'allow': endpoint_data.get('allow', 'ulaw,alaw'),
                 'callerid': endpoint_data.get('callerid', ''),
+                'set_var': endpoint_data.get('set_var', ''),
             }
             
             # Handle custom data
