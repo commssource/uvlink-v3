@@ -28,6 +28,8 @@ ASTERISK_CONFIG_PATH = os.getenv("ASTERISK_CONFIG_PATH")
 ASTERISK_PJSIP_CONFIG = os.path.join(ASTERISK_CONFIG_PATH, "pjsip.conf")
 ASTERISK_BACKUP_PATH = os.getenv("ASTERISK_BACKUP_PATH")
 ASTERISK_USER = os.getenv("ASTERISK_USER", "asterisk")
+ASTERISK_QUEUE_PATH = os.getenv("ASTERISK_QUEUE_PATH")
+ASTERISK_QUEUE_CONFIG = os.path.join(ASTERISK_QUEUE_PATH, "queues.conf")
 
 # Database configuration
 DB_HOST = os.getenv("DB_HOST", "localhost")

@@ -20,6 +20,7 @@ from apps.endpoints.routes import router as endpoints_router
 from shared.auth.routes import router as auth_router
 from apps.provisioning.routes import router as provisioning_router, prov_router
 from apps.inbound_call_routing import router as inbound_call_routing_router
+from apps.call_centre.queues import router as queues_router
 
 # Setup logging
 logging.basicConfig(level=getattr(logging, LOG_LEVEL.upper()))
@@ -64,11 +65,13 @@ try:
     app.include_router(provisioning_router, tags=["provisioning"])
     app.include_router(prov_router)
     app.include_router(inbound_call_routing_router)
+    app.include_router(queues_router)
     
     logger.info("✅ Endpoints app loaded")
     logger.info("✅ Auth app loaded")
     logger.info("✅ Provisioning app loaded")
     logger.info("✅ Inbound Call Routing app loaded")
+    logger.info("✅ Queues app loaded")
 except ImportError as e:
     logger.error(f"❌ Failed to load apps: {e}")
 
