@@ -2,3 +2,17 @@ venv/
 .env
 local_test/
 apps/endpoints/test_routes.py
+
+# Test related
+.pytest_cache/
+__pycache__/
+*.pyc
+.coverage
+htmlcov/
+.tox/
+.pytest_cache/
+test_*.py
+*_test.py
+*_tests.py
+tests/
+requirements-test.txt
