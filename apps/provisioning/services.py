@@ -6,7 +6,7 @@ from typing import Dict, Any
 import logging
 import traceback
 import time
-from config import API_KEY
+from config import API_KEY, SIP_SERVER_HOST, BASE_URL
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +24,45 @@ class YealinkConfig:
             raise HTTPException(
                 status_code=500,
                 detail=f"Failed to initialize Azure Storage client: {str(e)}"
+            )
+
+    async def delete_config_files(self, mac_address: str) -> None:
+        """Delete configuration files for a given MAC address"""
+        try:
+            logger.info(f"Deleting configuration files for MAC: {mac_address}")
+            
+            # Files to delete
+            files_to_delete = [
+                f"{mac_address}.cfg",
+                f"{mac_address}.boot"
+            ]
+            
+            for filename in files_to_delete:
+                try:
+                    blob_client = self.container_client.get_blob_client(filename)
+                    if blob_client.exists():
+                        logger.info(f"Deleting file: {filename}")
+                        blob_client.delete_blob()
+                        logger.info(f"Successfully deleted file: {filename}")
+                    else:
+                        logger.info(f"File does not exist, skipping deletion: {filename}")
+                except Exception as e:
+                    logger.error(f"Error deleting file {filename}: {str(e)}")
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Failed to delete file {filename}: {str(e)}"
+                    )
+            
+            logger.info(f"Successfully deleted all configuration files for MAC: {mac_address}")
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error while deleting configuration files: {str(e)}")
+            logger.error(traceback.format_exc())
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to delete configuration files: {str(e)}"
             )
 
     def get_file_content(self, filename: str) -> str:
@@ -156,14 +195,29 @@ class YealinkConfig:
                                     detail=f"Endpoint auth data missing required fields: {', '.join(missing_fields)}. Available fields: {', '.join(list(auth_data.keys()))}"
                                 )
                             
+                            # Get transport from transport_network data if available
+                            transport = 'udp'  # default to udp
+                            if 'transport_network' in data and isinstance(data['transport_network'], dict):
+                                transport_network = data['transport_network']
+                                logger.info(f"Transport network data: {transport_network}")
+                                if 'transport' in transport_network:
+                                    transport = transport_network['transport'].lower()
+                                    logger.info(f"Found transport type in transport_network: {transport}")
+                                else:
+                                    logger.info("No transport found in transport_network data, using default: udp")
+                            else:
+                                logger.info("No transport_network data found, using default transport: udp")
+                            
                             # Create the expected data structure
                             endpoint_data = {
                                 'endpoint_id': endpoint_id,  # Add endpoint ID to the data
                                 'auth_name': auth_data.get('username', ''),  # Use username as auth_name
                                 'username': auth_data.get('username', ''),
-                                'password': auth_data.get('password', '')
+                                'password': auth_data.get('password', ''),
+                                'transport': transport  # Add transport value
                             }
                             
+                            logger.info(f"Final endpoint data: {endpoint_data}")
                             total_time = time.time() - start_time
                             logger.info(f"Successfully fetched endpoint data in {total_time:.2f} seconds")
                             return endpoint_data
@@ -217,6 +271,7 @@ class YealinkConfig:
             # Fetch endpoint data
             try:
                 endpoint_data = await self._get_endpoint_data(endpoint_id, base_url)
+                logger.info(f"Fetched endpoint data: {endpoint_data}")
             except HTTPException as http_err:
                 # Log and re-raise HTTP exceptions
                 logger.error(f"HTTP error while fetching endpoint data: {http_err.detail}")
@@ -230,6 +285,7 @@ class YealinkConfig:
                 y000_content = self._generate_y000_content(mac_address, base_url)
                 config_time = time.time() - config_start
                 logger.info(f"Generated configuration content in {config_time:.2f} seconds")
+                logger.info(f"Generated config content: {config_content}")
             except Exception as e:
                 logger.error(f"Failed to generate configuration content: {str(e)}")
                 logger.error(traceback.format_exc())
@@ -251,6 +307,11 @@ class YealinkConfig:
                     upload_start = time.time()
                     logger.info(f"Uploading file: {filename}")
                     blob_client = self.container_client.get_blob_client(filename)
+                    # Delete existing blob if it exists
+                    if blob_client.exists():
+                        logger.info(f"Deleting existing blob: {filename}")
+                        blob_client.delete_blob()
+                    # Upload new content
                     blob_client.upload_blob(content, overwrite=True)
                     uploaded_urls[filename] = blob_client.url
                     upload_time = time.time() - upload_start
@@ -281,18 +342,42 @@ class YealinkConfig:
     def _generate_config_content(self, endpoint_data: Dict[str, Any]) -> str:
         try:
             logger.info("Generating config content")
+            logger.info(f"Endpoint data received: {endpoint_data}")
+            
+            # Map transport types to Yealink values
+            transport_map = {
+                'udp': '0',
+                'tcp': '1',
+                'tls': '2'
+            }
+            
+            # Get transport value from endpoint data, default to 'udp' if not specified
+            transport_type = endpoint_data.get('transport', 'udp').lower()
+            logger.info(f"Transport type from endpoint data: {transport_type}")
+            
+            # Map the transport type to Yealink value
+            transport_value = transport_map.get(transport_type)
+            if transport_value is None:
+                logger.warning(f"Unknown transport type: {transport_type}, defaulting to UDP (0)")
+                transport_value = '0'
+            
+            logger.info(f"Mapped transport value for Yealink: {transport_value}")
+            
             # Generate Yealink configuration content based on endpoint data
             config = f"""#!version:1.0.0.1
+
 account.1.enable = 1
 account.1.label = {endpoint_data.get('endpoint_id', '')}
 account.1.display_name = {endpoint_data.get('endpoint_id', '')}
 account.1.auth_name = {endpoint_data.get('auth_name', '')}
 account.1.user_name = {endpoint_data.get('username', '')}
 account.1.password = {endpoint_data.get('password', '')}
-account.1.transport = 0
+account.1.sip_server_host = {SIP_SERVER_HOST}
+account.1.sip_server_port = 5060
+account.1.transport = {transport_value}
 account.1.expires = 3600
 """
-            logger.info("Successfully generated config content")
+            logger.info(f"Generated config content: {config}")
             return config
         except Exception as e:
             logger.error(f"Failed to generate config content: {str(e)}")
@@ -305,10 +390,23 @@ account.1.expires = 3600
     def _generate_boot_content(self, mac_address: str, base_url: str) -> str:
         try:
             logger.info("Generating boot content")
+            logger.info(f"Using BASE_URL from parameter: {base_url}")
+            logger.info(f"Using BASE_URL from config: {BASE_URL}")
+            
+            # Use the provided base_url, but log if it differs from config
+            if base_url != BASE_URL:
+                logger.warning(f"BASE_URL mismatch - Parameter: {base_url}, Config: {BASE_URL}")
+            
+            # Remove /api/v1 from base_url if it exists
+            base_url = base_url.replace('/api/v1', '')
+            # Remove any trailing slashes
+            base_url = base_url.rstrip('/')
+            
+            # Use base_url directly without replacing localhost
             content = f"""#!version:1.0.0.1
-include:config "{base_url}/provisioning/{mac_address}.cfg"
+include:config "{base_url}/provisioning/mac_record/{mac_address}.cfg"
 """
-            logger.info("Successfully generated boot content")
+            logger.info(f"Generated boot content: {content}")
             return content
         except Exception as e:
             logger.error(f"Failed to generate boot content: {str(e)}")
@@ -321,10 +419,23 @@ include:config "{base_url}/provisioning/{mac_address}.cfg"
     def _generate_y000_content(self, mac_address: str, base_url: str) -> str:
         try:
             logger.info("Generating y000 content")
+            logger.info(f"Using BASE_URL from parameter: {base_url}")
+            logger.info(f"Using BASE_URL from config: {BASE_URL}")
+            
+            # Use the provided base_url, but log if it differs from config
+            if base_url != BASE_URL:
+                logger.warning(f"BASE_URL mismatch - Parameter: {base_url}, Config: {BASE_URL}")
+            
+            # Remove /api/v1 from base_url if it exists
+            base_url = base_url.replace('/api/v1', '')
+            # Remove any trailing slashes
+            base_url = base_url.rstrip('/')
+            
+            # Use base_url directly without replacing localhost
             content = f"""#!version:1.0.0.1
-include:config "{base_url}/provisioning/{mac_address}.cfg"
+include:config "{base_url}/provisioning/mac_record/{mac_address}.cfg"
 """
-            logger.info("Successfully generated y000 content")
+            logger.info(f"Generated y000 content: {content}")
             return content
         except Exception as e:
             logger.error(f"Failed to generate y000 content: {str(e)}")

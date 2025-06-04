@@ -28,8 +28,6 @@ ASTERISK_CONFIG_PATH = os.getenv("ASTERISK_CONFIG_PATH")
 ASTERISK_PJSIP_CONFIG = os.path.join(ASTERISK_CONFIG_PATH, "pjsip.conf")
 ASTERISK_BACKUP_PATH = os.getenv("ASTERISK_BACKUP_PATH")
 ASTERISK_USER = os.getenv("ASTERISK_USER", "asterisk")
-ASTERISK_QUEUE_PATH = os.getenv("ASTERISK_QUEUE_PATH")
-ASTERISK_QUEUE_CONFIG = os.path.join(ASTERISK_QUEUE_PATH, "queues.conf")
 
 # Database configuration
 DB_HOST = os.getenv("DB_HOST", "localhost")
@@ -63,6 +61,7 @@ if API_KEY_FILE and Path(API_KEY_FILE).exists():
         API_KEY = f.read().strip()
 
 # Server settings
+SIP_SERVER_HOST = os.getenv("SIP_SERVER_HOST", "s1.uvlink.co.uk")
 HOST = os.getenv("HOST", "0.0.0.0")
 PORT = int(os.getenv("PORT", 8000))
 LOG_LEVEL = os.getenv("LOG_LEVEL", "info")

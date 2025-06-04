@@ -55,27 +55,3 @@ class ProvisioningResponse(BaseModel):
     provisioning_status: Optional[str]
     last_provisioning_attempt: Optional[datetime]
     request_date: Optional[datetime]
-
-    class Config:
-        from_attributes = True
-        json_encoders = {
-            datetime: lambda dt: dt.isoformat() if dt else None
-        }
-
-    def model_post_init(self, __context):
-        """Convert UTC times to local timezone after model initialization"""
-        uk_tz = ZoneInfo("Europe/London")
-        
-        def convert_to_uk_time(dt: Optional[datetime]) -> Optional[datetime]:
-            if dt is None:
-                return None
-            # If datetime is naive (no timezone), assume it's UTC
-            if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=ZoneInfo("UTC"))
-            return dt.astimezone(uk_tz)
-        
-        # Convert all datetime fields to UK time
-        self.created_at = convert_to_uk_time(self.created_at)
-        self.updated_at = convert_to_uk_time(self.updated_at)
-        self.last_provisioning_attempt = convert_to_uk_time(self.last_provisioning_attempt)
-        self.request_date = convert_to_uk_time(self.request_date) 

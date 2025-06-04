@@ -1,8 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, Header, status
+from fastapi.security import HTTPBasic, HTTPBasicCredentials, HTTPBearer
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import List, Optional, Union
 from shared.database import get_db
+from shared.auth import verify_auth
+from shared.auth.provisioning import verify_basic_auth
 from .models import Provisioning
 from .services import YealinkConfig
 from pydantic import BaseModel
@@ -12,23 +14,100 @@ import traceback
 from config import (
     AZURE_STORAGE_CONNECTION_STRING,
     AZURE_STORAGE_CONTAINER,
-    BASE_URL
+    BASE_URL,
+    API_KEY,
+    JWT_SECRET,
+    JWT_ALGORITHM
 )
 from .schemas import ProvisioningUpdate, ProvisioningResponse
 from azure.storage.blob import BlobServiceClient
 from sqlalchemy import Column, DateTime, func
 from datetime import datetime
 from zoneinfo import ZoneInfo
+import jwt
+from jwt.exceptions import InvalidTokenError
+import base64
 
 logger = logging.getLogger(__name__)
 
 # API v1 router for provisioning management
 router = APIRouter(prefix="/api/v1/provisioning", tags=["provisioning"])
 
-# Router for authenticated configuration access
+# Root router for phone configuration access
+config_router = APIRouter(prefix="/provisioning", tags=["phone-config"])
+
+# New router for authenticated configuration access
 prov_router = APIRouter(prefix="/prov", tags=["phone-config"])
 
 security = HTTPBasic()
+bearer_scheme = HTTPBearer()
+
+async def verify_api_key(x_api_key: str = Header(None)):
+    if not x_api_key or x_api_key != API_KEY:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or missing API key"
+        )
+    return x_api_key
+
+async def verify_jwt_token(authorization: str = Header(None)):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or missing JWT token"
+        )
+    try:
+        token = authorization.split(" ")[1]
+        # Add your JWT verification logic here
+        # For example: jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+        return token
+    except InvalidTokenError:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid JWT token"
+        )
+
+async def verify_credentials(
+    credentials: HTTPBasicCredentials = Depends(security),
+    db: Session = Depends(get_db),
+    filename: str = None
+):
+    if not filename:
+        raise HTTPException(
+            status_code=400,
+            detail="Filename is required"
+        )
+
+    # Extract MAC address from filename
+    mac_address = filename.split('.')[0]
+    
+    # Get the provisioning record
+    provisioning = db.query(Provisioning).filter(
+        Provisioning.mac_address == mac_address
+    ).first()
+    
+    if not provisioning:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Provisioning record not found for MAC: {mac_address}"
+        )
+
+    # Verify credentials
+    if not provisioning.username or not provisioning.password:
+        raise HTTPException(
+            status_code=401,
+            detail="Provisioning record has no credentials configured"
+        )
+
+    # Check username and password
+    if credentials.username != provisioning.username or credentials.password != provisioning.password:
+        raise HTTPException(
+            status_code=401,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Basic"}
+        )
+    
+    return credentials
 
 class ProvisioningCreate(BaseModel):
     endpoint: str
@@ -114,8 +193,8 @@ async def create_provisioning(
                     **provisioning.model_dump(),
                     created_at=datetime.now(ZoneInfo("UTC")),
                     approved=False,  # Set approved to False by default
-                    username="",     # Set default empty values
-                    password="",     # Set default empty values
+                    username="",     # Will be set from endpoint data
+                    password="",     # Will be set from endpoint data
                     provisioning_request=None,
                     ip_address=None,
                     provisioning_status=None,
@@ -161,7 +240,12 @@ async def create_provisioning(
                         base_url=BASE_URL
                     )
                     
-                    # Set approved to True only after successful Azure storage
+                    # Get endpoint data to update credentials
+                    endpoint_data = await yealink_config._get_endpoint_data(provisioning.endpoint, BASE_URL)
+                    
+                    # Update provisioning record with credentials
+                    db_provisioning.username = endpoint_data.get('username', '')
+                    db_provisioning.password = endpoint_data.get('password', '')
                     db_provisioning.approved = True
                     db_provisioning.provisioning_status = 'OK'
                     db_provisioning.last_provisioning_attempt = datetime.now(ZoneInfo("UTC"))
@@ -214,78 +298,81 @@ async def get_provisioning(mac_address: str, db: Session = Depends(get_db)):
     return provisioning
 
 @router.get("/", response_model=List[ProvisioningResponse])
-async def list_provisioning(
-    make: Optional[str] = None,
-    model: Optional[str] = None,
-    approved: Optional[bool] = None,
-    page: int = 1,
-    limit: int = 10,
-    db: Session = Depends(get_db)
-):
-    """
-    List provisioning entries with optional filtering and pagination.
-    
-    Parameters:
-    - make: Filter by phone make (e.g., 'yealink')
-    - model: Filter by phone model (e.g., 'T48S')
-    - approved: Filter by approval status
-    - page: Page number (default: 1)
-    - limit: Number of items per page (default: 10)
-    """
+async def list_provisioning(db: Session = Depends(get_db)):
     try:
-        # Start with base query
-        query = db.query(Provisioning)
-        
-        # Apply filters if provided
-        if make:
-            query = query.filter(Provisioning.make.ilike(f"%{make}%"))
-        if model:
-            query = query.filter(Provisioning.model.ilike(f"%{model}%"))
-        if approved is not None:
-            query = query.filter(Provisioning.approved == approved)
-        
-        # Calculate pagination
-        total = query.count()
-        skip = (page - 1) * limit
-        
-        # Apply pagination
-        query = query.offset(skip).limit(limit)
-        
-        # Execute query
-        items = query.all()
-        
-        return items
-        
+        logger.info("Fetching all provisioning records")
+        records = db.query(Provisioning).all()
+        logger.info(f"Found {len(records)} records")
+        return records
     except Exception as e:
-        logger.error(f"Error listing provisioning entries: {str(e)}")
+        logger.error(f"Error fetching provisioning records: {str(e)}")
         logger.error(traceback.format_exc())
         raise HTTPException(
             status_code=500,
-            detail=f"Error listing provisioning entries: {str(e)}"
+            detail=f"Failed to fetch provisioning records: {str(e)}"
         )
 
 @router.put("/{mac_address}", response_model=ProvisioningResponse)
-async def update_provisioning(mac_address: str, provisioning: ProvisioningUpdate, db: Session = Depends(get_db)):
+async def update_provisioning(
+    mac_address: str,
+    provisioning: ProvisioningUpdate,
+    db: Session = Depends(get_db)
+):
     try:
-        db_provisioning = db.query(Provisioning).filter(Provisioning.mac_address == mac_address).first()
+        logger.info(f"Updating provisioning for MAC: {mac_address}")
+        logger.info(f"Update data: {provisioning.model_dump()}")
+        
+        # Find the existing provisioning entry
+        db_provisioning = db.query(Provisioning).filter(
+            Provisioning.mac_address == mac_address
+        ).first()
+        
         if not db_provisioning:
-            raise HTTPException(status_code=404, detail="Provisioning not found")
-        
-        # Store old values for comparison
+            raise HTTPException(
+                status_code=404,
+                detail=f"Provisioning not found for MAC: {mac_address}"
+            )
+
+        # Store old MAC address for cleanup if it's being changed
         old_mac_address = db_provisioning.mac_address
-        old_endpoint = db_provisioning.endpoint
-        
-        # Update fields
-        for field, value in provisioning.model_dump(exclude_unset=True).items():
+        mac_address_changed = old_mac_address != provisioning.mac_address
+
+        # If MAC address changed, delete old configuration files first
+        if mac_address_changed and db_provisioning.make.lower() == "yealink":
+            try:
+                if not AZURE_STORAGE_CONNECTION_STRING:
+                    raise HTTPException(
+                        status_code=500,
+                        detail="Azure Storage connection string is not configured"
+                    )
+
+                yealink_config = YealinkConfig(
+                    connection_string=AZURE_STORAGE_CONNECTION_STRING,
+                    container_name=AZURE_STORAGE_CONTAINER
+                )
+
+                logger.info(f"MAC address changed from {old_mac_address} to {provisioning.mac_address}")
+                # Delete old configuration files
+                await yealink_config.delete_config_files(old_mac_address)
+                logger.info(f"Successfully deleted old configuration files for MAC: {old_mac_address}")
+            except Exception as delete_error:
+                logger.error(f"Error deleting old configuration files: {str(delete_error)}")
+                logger.error(traceback.format_exc())
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to delete old configuration files: {str(delete_error)}"
+                )
+
+        # Update the provisioning entry
+        update_data = provisioning.model_dump(exclude_unset=True)
+        for field, value in update_data.items():
             setattr(db_provisioning, field, value)
         
-        # Always update the updated_at timestamp
         db_provisioning.updated_at = datetime.now(ZoneInfo("UTC"))
         
-        # If it's a Yealink phone, update configuration files
+        # If it's a Yealink phone, generate new configuration files
         if db_provisioning.make.lower() == "yealink":
             try:
-                # Check required configuration
                 if not AZURE_STORAGE_CONNECTION_STRING:
                     raise HTTPException(
                         status_code=500,
@@ -297,63 +384,34 @@ async def update_provisioning(mac_address: str, provisioning: ProvisioningUpdate
                     container_name=AZURE_STORAGE_CONTAINER
                 )
                 
-                logger.info(f"Updating Yealink configuration for MAC: {mac_address}")
-                logger.info(f"Using endpoint ID: {db_provisioning.endpoint}")
-                logger.info(f"Using BASE_URL: {BASE_URL}")
+                # Generate new configuration files with latest endpoint data
+                logger.info(f"Generating new Yealink configuration for MAC: {provisioning.mac_address}")
+                await yealink_config.generate_config_files(
+                    mac_address=provisioning.mac_address,
+                    endpoint_id=provisioning.endpoint,
+                    base_url=BASE_URL
+                )
                 
-                try:
-                    # Generate new configuration files
-                    await yealink_config.generate_config_files(
-                        mac_address=db_provisioning.mac_address,
-                        endpoint_id=db_provisioning.endpoint,
-                        base_url=BASE_URL
-                    )
-                    
-                    # If MAC address changed, delete old files
-                    if old_mac_address != db_provisioning.mac_address:
-                        logger.info(f"MAC address changed from {old_mac_address} to {db_provisioning.mac_address}")
-                        # Delete old configuration files
-                        old_files = {
-                            "config": f"{old_mac_address}.cfg",
-                            "boot": f"{old_mac_address}.boot"
-                        }
-                        for file_type, filename in old_files.items():
-                            try:
-                                await yealink_config.delete_file(filename)
-                                logger.info(f"Deleted old {file_type} file: {filename}")
-                            except Exception as e:
-                                logger.warning(f"Failed to delete old {file_type} file: {str(e)}")
-                    
-                    logger.info("Successfully updated Yealink configuration")
-                except HTTPException as config_http_error:
-                    # Log the error details
-                    logger.error(f"Configuration HTTP error: {config_http_error.detail}")
-                    logger.error(f"Status code: {config_http_error.status_code}")
-                    # Rollback database changes
-                    db.rollback()
-                    # Re-raise with the original error details
-                    raise HTTPException(
-                        status_code=config_http_error.status_code,
-                        detail=config_http_error.detail
-                    )
+                # Update provisioning status
+                db_provisioning.approved = True
+                db_provisioning.provisioning_status = 'OK'
+                db_provisioning.last_provisioning_attempt = datetime.now(ZoneInfo("UTC"))
                 
             except Exception as config_error:
-                logger.error(f"Configuration generation error: {str(config_error)}")
+                logger.error(f"Configuration error: {str(config_error)}")
                 logger.error(traceback.format_exc())
-                # Rollback database changes
-                db.rollback()
+                db_provisioning.provisioning_status = 'FAILED'
+                db_provisioning.last_provisioning_attempt = datetime.now(ZoneInfo("UTC"))
                 raise HTTPException(
                     status_code=500,
                     detail=f"Failed to update configuration: {str(config_error)}"
                 )
-        
-        # Commit database changes
+
         db.commit()
         db.refresh(db_provisioning)
         return db_provisioning
 
     except HTTPException:
-        # Re-raise HTTP exceptions without wrapping
         raise
     except Exception as e:
         logger.error(f"Unexpected error in update_provisioning: {str(e)}")
@@ -363,37 +421,286 @@ async def update_provisioning(mac_address: str, provisioning: ProvisioningUpdate
             detail=f"Internal server error: {str(e)}"
         )
 
-@router.get("/storage/{mac_address}")
-async def get_storage_files(mac_address: str):
-    # Use your config values
-    connection_string = AZURE_STORAGE_CONNECTION_STRING
-    container_name = AZURE_STORAGE_CONTAINER
+@router.get("/storage/list")
+async def list_storage_files(
+    authorization: str = Header(None)
+):
+    """List all files in Azure Storage"""
+    try:
+        logger.info("Listing all files in storage")
+        
+        # Check for authorization header
+        if not authorization:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Missing authorization header"
+            )
 
-    if not connection_string or not container_name:
-        raise HTTPException(status_code=500, detail="Azure Storage configuration missing")
+        # Check if it's a Bearer token or API key
+        if not authorization.startswith("Bearer "):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid authorization format. Use 'Bearer <token>' or 'Bearer <api_key>'"
+            )
 
-    blob_service_client = BlobServiceClient.from_connection_string(connection_string)
-    container_client = blob_service_client.get_container_client(container_name)
+        # Extract the token/key
+        token = authorization.split(" ")[1]
 
-    files = {
-        "config": f"{mac_address}.cfg",
-        "boot": f"{mac_address}.boot",
-        "y000": "y000000000000.cfg"
-    }
+        # Try to verify as JWT first
+        try:
+            payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+            if payload.get("type") != "access":
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid token type"
+                )
+        except jwt.PyJWTError:
+            # If JWT verification fails, try as API key
+            if token != API_KEY:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid token or API key"
+                )
 
-    result = {}
-    for file_type, filename in files.items():
+        if not AZURE_STORAGE_CONNECTION_STRING:
+            raise HTTPException(
+                status_code=500,
+                detail="Azure Storage connection string is not configured"
+            )
+
+        # Initialize Azure Storage client
+        blob_service_client = BlobServiceClient.from_connection_string(AZURE_STORAGE_CONNECTION_STRING)
+        container_client = blob_service_client.get_container_client(AZURE_STORAGE_CONTAINER)
+
+        # List all blobs
+        files = []
+        for blob in container_client.list_blobs():
+            files.append(blob.name)
+
+        # Return the list as plain text, one file per line
+        return Response(
+            content="\n".join(files),
+            media_type="text/plain"
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error listing storage files: {str(e)}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to list storage files: {str(e)}"
+        )
+
+@router.get("/storage/{filename}")
+async def get_storage_file(
+    filename: str,
+    authorization: str = Header(None),
+    db: Session = Depends(get_db)
+):
+    """Get the content of a file from Azure Storage"""
+    try:
+        logger.info(f"Getting file content for: {filename}")
+        
+        # Extract MAC address from filename
+        mac_address = filename.split('.')[0]
+        
+        # Check for authorization header
+        if not authorization:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Missing authorization header"
+            )
+
+        # Parse authorization header
+        try:
+            auth_parts = authorization.split(" ", 1)
+            auth_type = auth_parts[0].lower()
+            auth_value = auth_parts[1] if len(auth_parts) > 1 else None
+
+            if not auth_value:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid authorization format. Use 'Basic <credentials>', 'Bearer <token>' or 'Bearer <api_key>'"
+                )
+
+            if auth_type == "basic":
+                # Handle Basic auth
+                try:
+                    # Decode base64 credentials
+                    decoded = base64.b64decode(auth_value).decode('utf-8')
+                    username, password = decoded.split(':', 1)
+                    
+                    # Verify basic auth
+                    credentials = HTTPBasicCredentials(
+                        username=username,
+                        password=password
+                    )
+                    await verify_basic_auth(credentials, db, mac_address)
+                except Exception as e:
+                    logger.error(f"Basic auth error: {str(e)}")
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="Invalid basic auth credentials",
+                        headers={"WWW-Authenticate": "Basic"}
+                    )
+            elif auth_type == "bearer":
+                # Handle Bearer token (JWT or API key)
+                try:
+                    # Try to verify as JWT first
+                    payload = jwt.decode(auth_value, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+                    if payload.get("type") != "access":
+                        raise HTTPException(
+                            status_code=status.HTTP_401_UNAUTHORIZED,
+                            detail="Invalid token type"
+                        )
+                except jwt.PyJWTError:
+                    # If JWT verification fails, try as API key
+                    if auth_value != API_KEY:
+                        raise HTTPException(
+                            status_code=status.HTTP_401_UNAUTHORIZED,
+                            detail="Invalid token or API key"
+                        )
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid authorization type. Use 'Basic' or 'Bearer'"
+                )
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Authorization parsing error: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid authorization format"
+            )
+
+        if not AZURE_STORAGE_CONNECTION_STRING:
+            raise HTTPException(
+                status_code=500,
+                detail="Azure Storage connection string is not configured"
+            )
+
+        # Initialize Azure Storage client
+        blob_service_client = BlobServiceClient.from_connection_string(AZURE_STORAGE_CONNECTION_STRING)
+        container_client = blob_service_client.get_container_client(AZURE_STORAGE_CONTAINER)
         blob_client = container_client.get_blob_client(filename)
-        exists = blob_client.exists()
-        result[file_type] = {
-            "url": blob_client.url,
-            "exists": exists
-        }
 
-    return result
+        # Check if file exists
+        if not blob_client.exists():
+            raise HTTPException(
+                status_code=404,
+                detail=f"File not found: {filename}"
+            )
 
-# Move all config_router endpoints to prov_router
-@prov_router.get("/{mac_address}.cfg")
+        # Get file content
+        download_stream = blob_client.download_blob()
+        content = download_stream.readall().decode('utf-8')
+
+        # Return the content as plain text
+        return Response(
+            content=content,
+            media_type="text/plain"
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting file content: {str(e)}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get file content: {str(e)}"
+        )
+
+@router.get("/mac_record/{mac_address}")
+@router.get("/mac_record/{mac_address}.cfg")
+async def get_mac_record(
+    mac_address: str,
+    credentials: HTTPBasicCredentials = Depends(security),
+    db: Session = Depends(get_db)
+):
+    """Get the content of a configuration file from Azure Storage"""
+    try:
+        # Remove .cfg extension if present
+        mac_address = mac_address.replace('.cfg', '')
+        logger.info(f"Fetching configuration content for MAC: {mac_address}")
+        
+        if not AZURE_STORAGE_CONNECTION_STRING:
+            raise HTTPException(
+                status_code=500,
+                detail="Azure Storage connection string is not configured"
+            )
+
+        # Get the provisioning record to get the endpoint ID
+        provisioning = db.query(Provisioning).filter(
+            Provisioning.mac_address == mac_address
+        ).first()
+        
+        if not provisioning:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Provisioning record not found for MAC: {mac_address}"
+            )
+
+        # Verify credentials
+        if not provisioning.username or not provisioning.password:
+            raise HTTPException(
+                status_code=401,
+                detail="Provisioning record has no credentials configured"
+            )
+
+        # Check username and password
+        if credentials.username != provisioning.username or credentials.password != provisioning.password:
+            raise HTTPException(
+                status_code=401,
+                detail="Incorrect username or password",
+                headers={"WWW-Authenticate": "Basic"}
+            )
+
+        yealink_config = YealinkConfig(
+            connection_string=AZURE_STORAGE_CONNECTION_STRING,
+            container_name=AZURE_STORAGE_CONTAINER
+        )
+
+        # Fetch fresh endpoint data
+        try:
+            endpoint_data = await yealink_config._get_endpoint_data(provisioning.endpoint, BASE_URL)
+            # Generate new config content with latest data
+            config_content = yealink_config._generate_config_content(endpoint_data)
+            
+            # Return the content as plain text
+            return Response(
+                content=config_content,
+                media_type="text/plain"
+            )
+        except Exception as e:
+            logger.error(f"Error fetching endpoint data: {str(e)}")
+            # If we can't get fresh data, fall back to stored config
+            config_content = yealink_config.get_file_content(f"{mac_address}.cfg")
+            if not config_content:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Configuration file not found for MAC: {mac_address}"
+                )
+            return Response(
+                content=config_content,
+                media_type="text/plain"
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error in get_mac_record: {str(e)}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch configuration content: {str(e)}"
+        )
+
+# Phone configuration endpoints
+@config_router.get("/{mac_address}.cfg")
 async def get_phone_config(mac_address: str, db: Session = Depends(get_db)):
     provisioning = db.query(Provisioning).filter(Provisioning.mac_address == mac_address).first()
     if not provisioning:
@@ -413,7 +720,7 @@ async def get_phone_config(mac_address: str, db: Session = Depends(get_db)):
             raise HTTPException(status_code=500, detail=str(e))
     raise HTTPException(status_code=400, detail="Unsupported phone make")
 
-@prov_router.get("/{mac_address}.boot")
+@config_router.get("/{mac_address}.boot")
 async def get_phone_boot(mac_address: str, db: Session = Depends(get_db)):
     provisioning = db.query(Provisioning).filter(Provisioning.mac_address == mac_address).first()
     if not provisioning:
@@ -430,7 +737,7 @@ async def get_phone_boot(mac_address: str, db: Session = Depends(get_db)):
             raise HTTPException(status_code=500, detail=str(e))
     raise HTTPException(status_code=400, detail="Unsupported phone make")
 
-@prov_router.get("/y000000000000.cfg")
+@config_router.get("/y000000000000.cfg")
 async def get_y000_config(db: Session = Depends(get_db)):
     # This endpoint will return the default Yealink configuration
     try:

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, field_validator, ConfigDict
+from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional, Dict, Any, Union
 from datetime import datetime
 import re
@@ -104,8 +104,6 @@ class AORConfig(BaseModel):
 
 class AdvancedEndpoint(BaseModel):
     """Advanced PJSIP Endpoint with all configuration options organized by category"""
-    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
-    
     id: str = Field(..., min_length=1, max_length=50, pattern=r'^[a-zA-Z0-9_-]+$')
     type: str = Field(default="endpoint")
     context: str = Field(default="internal")
@@ -154,6 +152,10 @@ class AdvancedEndpoint(BaseModel):
     aor: AORConfig
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+        populate_by_name = True
 
     def to_flat_dict(self) -> Dict[str, Any]:
         """Convert nested structure to flat dictionary for PJSIP config"""
@@ -242,9 +244,6 @@ class EndpointListResponse(BaseModel):
     success: bool
     count: int
     endpoints: List[Dict[str, Any]]
-    page: int
-    limit: int
-    total_pages: int
 
 class ConfigResponse(BaseModel):
     """Response for configuration operations"""
