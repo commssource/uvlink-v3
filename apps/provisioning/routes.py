@@ -510,7 +510,8 @@ async def get_storage_file(
         if not authorization:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Missing authorization header"
+                detail="Missing authorization header",
+                headers={"WWW-Authenticate": "Basic"}
             )
 
         # Parse authorization header
@@ -522,22 +523,56 @@ async def get_storage_file(
             if not auth_value:
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid authorization format. Use 'Basic <credentials>', 'Bearer <token>' or 'Bearer <api_key>'"
+                    detail="Invalid authorization format. Use 'Basic <credentials>', 'Bearer <token>' or 'Bearer <api_key>'",
+                    headers={"WWW-Authenticate": "Basic"}
                 )
 
             if auth_type == "basic":
                 # Handle Basic auth
                 try:
                     # Decode base64 credentials
-                    decoded = base64.b64decode(auth_value).decode('utf-8')
-                    username, password = decoded.split(':', 1)
+                    try:
+                        decoded = base64.b64decode(auth_value).decode('utf-8')
+                        username, password = decoded.split(':', 1)
+                    except Exception as e:
+                        logger.error(f"Failed to decode base64 credentials: {str(e)}")
+                        raise HTTPException(
+                            status_code=status.HTTP_401_UNAUTHORIZED,
+                            detail="Invalid basic auth credentials format",
+                            headers={"WWW-Authenticate": "Basic"}
+                        )
                     
-                    # Verify basic auth
-                    credentials = HTTPBasicCredentials(
-                        username=username,
-                        password=password
-                    )
-                    await verify_basic_auth(credentials, db, mac_address)
+                    # Get the provisioning record
+                    provisioning = db.query(Provisioning).filter(
+                        Provisioning.mac_address == mac_address
+                    ).first()
+                    
+                    if not provisioning:
+                        logger.error(f"Provisioning record not found for MAC: {mac_address}")
+                        raise HTTPException(
+                            status_code=404,
+                            detail=f"Provisioning record not found for MAC: {mac_address}"
+                        )
+
+                    # Verify credentials
+                    if not provisioning.username or not provisioning.password:
+                        logger.error("Provisioning record has no credentials configured")
+                        raise HTTPException(
+                            status_code=401,
+                            detail="Provisioning record has no credentials configured",
+                            headers={"WWW-Authenticate": "Basic"}
+                        )
+
+                    # Check username and password
+                    if username != provisioning.username or password != provisioning.password:
+                        logger.error(f"Invalid credentials for MAC: {mac_address}")
+                        raise HTTPException(
+                            status_code=401,
+                            detail="Incorrect username or password",
+                            headers={"WWW-Authenticate": "Basic"}
+                        )
+                except HTTPException:
+                    raise
                 except Exception as e:
                     logger.error(f"Basic auth error: {str(e)}")
                     raise HTTPException(
@@ -565,7 +600,8 @@ async def get_storage_file(
             else:
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid authorization type. Use 'Basic' or 'Bearer'"
+                    detail="Invalid authorization type. Use 'Basic' or 'Bearer'",
+                    headers={"WWW-Authenticate": "Basic"}
                 )
         except HTTPException:
             raise
@@ -573,7 +609,8 @@ async def get_storage_file(
             logger.error(f"Authorization parsing error: {str(e)}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid authorization format"
+                detail="Invalid authorization format",
+                headers={"WWW-Authenticate": "Basic"}
             )
 
         if not AZURE_STORAGE_CONNECTION_STRING:
