@@ -18,7 +18,8 @@ from shared.database import init_database
 # Import routers
 from apps.endpoints.routes import router as endpoints_router
 from shared.auth.routes import router as auth_router
-from apps.provisioning.routes import router as provisioning_router, config_router, prov_router
+from apps.provisioning.routes import router as provisioning_router
+from apps.provisioning.routes import prov_router
 from apps.inbound_call_routing import router as inbound_call_routing_router
 
 # Setup logging
@@ -61,8 +62,7 @@ try:
     # Include routers
     app.include_router(endpoints_router)
     app.include_router(auth_router)
-    app.include_router(provisioning_router, tags=["provisioning"])
-    app.include_router(config_router)
+    app.include_router(provisioning_router)
     app.include_router(prov_router)
     app.include_router(inbound_call_routing_router)
     

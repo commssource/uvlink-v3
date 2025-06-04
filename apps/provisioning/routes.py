@@ -33,9 +33,6 @@ logger = logging.getLogger(__name__)
 # API v1 router for provisioning management
 router = APIRouter(prefix="/api/v1/provisioning", tags=["provisioning"])
 
-# Root router for phone configuration access
-config_router = APIRouter(prefix="/provisioning", tags=["phone-config"])
-
 # New router for authenticated configuration access
 prov_router = APIRouter(prefix="/prov", tags=["phone-config"])
 
@@ -421,7 +418,7 @@ async def update_provisioning(
             detail=f"Internal server error: {str(e)}"
         )
 
-@router.get("/storage/list")
+@router.get("/prov/endpoint")
 async def list_storage_files(
     authorization: str = Header(None)
 ):
@@ -496,16 +493,83 @@ async def list_storage_files(
 @router.get("/storage/{filename}")
 async def get_storage_file(
     filename: str,
+    request: Request,
     authorization: str = Header(None),
     db: Session = Depends(get_db)
 ):
-    """Get the content of a file from Azure Storage"""
+    """Get the content of a file from Azure Storage and update provisioning record"""
     try:
         logger.info(f"Getting file content for: {filename}")
         
         # Extract MAC address from filename
-        mac_address = filename.split('.')[0]
+        mac_address = filename.split('.')[0].upper()
         
+        # Get headers
+        user_agent = request.headers.get("user-agent", "")
+        ip_address = request.headers.get("x-forwarded-for", request.client.host if request.client else "")
+
+        logger.info(f"Request details - MAC: {mac_address}, IP: {ip_address}, User-Agent: {user_agent}")
+
+        # Get current timestamp
+        current_time = datetime.now(ZoneInfo("UTC"))
+
+        # Check if provisioning record exists
+        provisioning = db.query(Provisioning).filter(
+            Provisioning.mac_address == mac_address
+        ).first()
+
+        if provisioning:
+            # Update existing record
+            logger.info(f"Updating existing provisioning record for MAC: {mac_address}")
+            
+            # Update last_provisioning_attempt
+            provisioning.last_provisioning_attempt = current_time
+            
+            # Update other fields if they've changed
+            if user_agent != provisioning.provisioning_request:
+                provisioning.provisioning_request = user_agent
+            if ip_address != provisioning.ip_address:
+                provisioning.ip_address = ip_address
+
+            # Check if phone is successfully provisioned
+            provisioning.provisioning_status = 'OK'
+
+        else:
+            # Create new record
+            logger.info(f"Creating new provisioning record for MAC: {mac_address}")
+            provisioning = Provisioning(
+                mac_address=mac_address,
+                provisioning_request=user_agent,
+                ip_address=ip_address,
+                request_date=current_time,
+                last_provisioning_attempt=current_time,
+                provisioning_status='FAILED',  # Initial status is FAILED
+                created_at=current_time,
+                updated_at=current_time,
+                # Set default values for required fields
+                endpoint="",  # This will need to be updated later
+                make="",     # This will need to be updated later
+                model="",    # This will need to be updated later
+                username="", # This will need to be updated later
+                password="", # This will need to be updated later
+                status=True
+            )
+            db.add(provisioning)
+
+        # Commit changes
+        try:
+            db.commit()
+            db.refresh(provisioning)
+            logger.info(f"Successfully updated provisioning record for MAC: {mac_address}")
+        except Exception as db_error:
+            logger.error(f"Database error: {str(db_error)}")
+            logger.error(traceback.format_exc())
+            db.rollback()
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to update provisioning record"
+            )
+
         # Check for authorization header
         if not authorization:
             raise HTTPException(
@@ -651,379 +715,248 @@ async def get_storage_file(
             detail=f"Failed to get file content: {str(e)}"
         )
 
-@router.get("/mac_record/{mac_address}")
-@router.get("/mac_record/{mac_address}.cfg")
-async def get_mac_record(
-    mac_address: str,
-    authorization: str = Header(None),
+@prov_router.get("/endpoint")
+async def handle_provisioning_request(
+    request: Request,
     db: Session = Depends(get_db)
 ):
-    """Get the content of a configuration file from Azure Storage"""
+    """Handle provisioning request from phone"""
     try:
-        # Remove .cfg extension if present
-        mac_address = mac_address.replace('.cfg', '')
-        logger.info(f"Fetching configuration content for MAC: {mac_address}")
-        
-        # Check for authorization header
-        if not authorization:
+        # Get headers
+        user_agent = request.headers.get("user-agent", "")
+        mac_address = request.headers.get("mac-address", "")
+        ip_address = request.headers.get("x-forwarded-for", request.client.host if request.client else "")
+
+        logger.info(f"Received provisioning request - MAC: {mac_address}, IP: {ip_address}, User-Agent: {user_agent}")
+
+        if not mac_address:
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Missing authorization header"
+                status_code=400,
+                detail="MAC address is required"
             )
 
-        # Parse authorization header
+        # Get current timestamp
+        current_time = datetime.now(ZoneInfo("UTC"))
+
+        # Check if provisioning record exists
+        provisioning = db.query(Provisioning).filter(
+            Provisioning.mac_address == mac_address
+        ).first()
+
+        if provisioning:
+            # Update existing record
+            logger.info(f"Updating existing provisioning record for MAC: {mac_address}")
+            
+            # Update last_provisioning_attempt
+            provisioning.last_provisioning_attempt = current_time
+            
+            # Update other fields if they've changed
+            if user_agent != provisioning.provisioning_request:
+                provisioning.provisioning_request = user_agent
+            if ip_address != provisioning.ip_address:
+                provisioning.ip_address = ip_address
+
+            # Check if phone is successfully provisioned
+            # You might want to add your own logic here to determine if provisioning was successful
+            provisioning.provisioning_status = 'OK'  # or 'FAILED' based on your logic
+
+        else:
+            # Create new record
+            logger.info(f"Creating new provisioning record for MAC: {mac_address}")
+            provisioning = Provisioning(
+                mac_address=mac_address,
+                provisioning_request=user_agent,
+                ip_address=ip_address,
+                request_date=current_time,
+                last_provisioning_attempt=current_time,
+                provisioning_status='FAILED',  # Initial status is FAILED
+                created_at=current_time,
+                updated_at=current_time,
+                # Set default values for required fields
+                endpoint="",  # This will need to be updated later
+                make="",     # This will need to be updated later
+                model="",    # This will need to be updated later
+                username="", # This will need to be updated later
+                password="", # This will need to be updated later
+                status=True
+            )
+            db.add(provisioning)
+
+        # Commit changes
         try:
-            auth_parts = authorization.split(" ", 1)
-            auth_type = auth_parts[0].lower()
-            auth_value = auth_parts[1] if len(auth_parts) > 1 else None
-
-            if not auth_value:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid authorization format. Use 'Basic <credentials>', 'Bearer <token>' or 'Bearer <api_key>'"
-                )
-
-            if auth_type == "basic":
-                # Handle Basic auth
-                try:
-                    # Decode base64 credentials
-                    decoded = base64.b64decode(auth_value).decode('utf-8')
-                    username, password = decoded.split(':', 1)
-                    
-                    # Get the provisioning record
-                    provisioning = db.query(Provisioning).filter(
-                        Provisioning.mac_address == mac_address
-                    ).first()
-                    
-                    if not provisioning:
-                        raise HTTPException(
-                            status_code=404,
-                            detail=f"Provisioning record not found for MAC: {mac_address}"
-                        )
-
-                    # Verify credentials
-                    if not provisioning.username or not provisioning.password:
-                        raise HTTPException(
-                            status_code=401,
-                            detail="Provisioning record has no credentials configured"
-                        )
-
-                    # Check username and password
-                    if username != provisioning.username or password != provisioning.password:
-                        raise HTTPException(
-                            status_code=401,
-                            detail="Incorrect username or password",
-                            headers={"WWW-Authenticate": "Basic"}
-                        )
-                except Exception as e:
-                    logger.error(f"Basic auth error: {str(e)}")
-                    raise HTTPException(
-                        status_code=status.HTTP_401_UNAUTHORIZED,
-                        detail="Invalid basic auth credentials",
-                        headers={"WWW-Authenticate": "Basic"}
-                    )
-            elif auth_type == "bearer":
-                # Handle Bearer token (JWT or API key)
-                try:
-                    # Try to verify as JWT first
-                    payload = jwt.decode(auth_value, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-                    if payload.get("type") != "access":
-                        raise HTTPException(
-                            status_code=status.HTTP_401_UNAUTHORIZED,
-                            detail="Invalid token type"
-                        )
-                except jwt.PyJWTError:
-                    # If JWT verification fails, try as API key
-                    if auth_value != API_KEY:
-                        raise HTTPException(
-                            status_code=status.HTTP_401_UNAUTHORIZED,
-                            detail="Invalid token or API key"
-                        )
-            else:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid authorization type. Use 'Basic' or 'Bearer'"
-                )
-        except HTTPException:
-            raise
-        except Exception as e:
-            logger.error(f"Authorization parsing error: {str(e)}")
+            db.commit()
+            db.refresh(provisioning)
+            logger.info(f"Successfully updated provisioning record for MAC: {mac_address}")
+        except Exception as db_error:
+            logger.error(f"Database error: {str(db_error)}")
+            logger.error(traceback.format_exc())
+            db.rollback()
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid authorization format"
+                status_code=500,
+                detail="Failed to update provisioning record"
             )
 
+        # Return success response
+        return {
+            "status": "success",
+            "message": "Provisioning request processed",
+            "mac_address": mac_address,
+            "provisioning_status": provisioning.provisioning_status
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error in handle_provisioning_request: {str(e)}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error: {str(e)}"
+        )
+
+@prov_router.get("/endpoint/{filename}")
+async def handle_file_request(
+    filename: str,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Handle file requests from phones and create/update provisioning records"""
+    try:
+        # Extract MAC address from filename
+        mac_address = filename.split('.')[0].upper()
+        
+        # Get headers
+        user_agent = request.headers.get("user-agent", "")
+        ip_address = request.headers.get("x-forwarded-for", request.client.host if request.client else "")
+
+        logger.info(f"Received file request - File: {filename}, MAC: {mac_address}, IP: {ip_address}, User-Agent: {user_agent}")
+
+        # Extract MAC address from User-Agent
+        user_agent_mac = None
+        if "Yealink" in user_agent:
+            # Extract MAC address from User-Agent (format: Yealink SIP-T43U 108.87.0.15 24:9a:d8:18:cd:91)
+            parts = user_agent.split()
+            if len(parts) >= 3:
+                user_agent_mac = parts[-1].replace(':', '').upper()
+                logger.info(f"Extracted MAC from User-Agent: {user_agent_mac}")
+
+        # Only proceed if MAC addresses match
+        if not user_agent_mac or user_agent_mac != mac_address:
+            logger.warning(f"MAC address mismatch - Filename: {mac_address}, User-Agent: {user_agent_mac}")
+            # Still serve the file but don't update database
+            return await serve_file(filename)
+
+        # Get current timestamp
+        current_time = datetime.now(ZoneInfo("UTC"))
+
+        # Check if provisioning record exists
+        provisioning = db.query(Provisioning).filter(
+            Provisioning.mac_address == mac_address
+        ).first()
+
+        if provisioning:
+            # Update existing record
+            logger.info(f"Updating existing provisioning record for MAC: {mac_address}")
+            
+            # Update last_provisioning_attempt
+            provisioning.last_provisioning_attempt = current_time
+            
+            # Update other fields if they've changed
+            if user_agent != provisioning.provisioning_request:
+                provisioning.provisioning_request = user_agent
+            if ip_address != provisioning.ip_address:
+                provisioning.ip_address = ip_address
+
+            # Check if phone is successfully provisioned
+            provisioning.provisioning_status = 'OK'
+
+        else:
+            # Create new record
+            logger.info(f"Creating new provisioning record for MAC: {mac_address}")
+            provisioning = Provisioning(
+                mac_address=mac_address,
+                provisioning_request=user_agent,
+                ip_address=ip_address,
+                request_date=current_time,
+                last_provisioning_attempt=current_time,
+                provisioning_status='FAILED',  # Initial status is FAILED
+                created_at=current_time,
+                updated_at=current_time,
+                # Set default values for required fields
+                endpoint="",  # This will need to be updated later
+                make="",     # This will need to be updated later
+                model="",    # This will need to be updated later
+                username="", # This will need to be updated later
+                password="", # This will need to be updated later
+                status=True
+            )
+            db.add(provisioning)
+
+        # Commit changes
+        try:
+            db.commit()
+            db.refresh(provisioning)
+            logger.info(f"Successfully updated provisioning record for MAC: {mac_address}")
+        except Exception as db_error:
+            logger.error(f"Database error: {str(db_error)}")
+            logger.error(traceback.format_exc())
+            db.rollback()
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to update provisioning record"
+            )
+
+        # Serve the file
+        return await serve_file(filename)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error in handle_file_request: {str(e)}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error: {str(e)}"
+        )
+
+async def serve_file(filename: str):
+    """Helper function to serve files from Azure Storage"""
+    try:
         if not AZURE_STORAGE_CONNECTION_STRING:
             raise HTTPException(
                 status_code=500,
                 detail="Azure Storage connection string is not configured"
             )
 
-        # Get the provisioning record to get the endpoint ID
-        provisioning = db.query(Provisioning).filter(
-            Provisioning.mac_address == mac_address
-        ).first()
-        
-        if not provisioning:
+        # Initialize Azure Storage client
+        blob_service_client = BlobServiceClient.from_connection_string(AZURE_STORAGE_CONNECTION_STRING)
+        container_client = blob_service_client.get_container_client(AZURE_STORAGE_CONTAINER)
+        blob_client = container_client.get_blob_client(filename)
+
+        # Check if file exists
+        if not blob_client.exists():
+            logger.error(f"File not found in storage: {filename}")
             raise HTTPException(
                 status_code=404,
-                detail=f"Provisioning record not found for MAC: {mac_address}"
+                detail=f"File not found: {filename}"
             )
 
-        yealink_config = YealinkConfig(
-            connection_string=AZURE_STORAGE_CONNECTION_STRING,
-            container_name=AZURE_STORAGE_CONTAINER
+        # Get file content
+        download_stream = blob_client.download_blob()
+        content = download_stream.readall().decode('utf-8')
+
+        # Return the content as plain text
+        return Response(
+            content=content,
+            media_type="text/plain"
         )
-
-        # Fetch fresh endpoint data
-        try:
-            endpoint_data = await yealink_config._get_endpoint_data(provisioning.endpoint, BASE_URL)
-            # Generate new config content with latest data
-            config_content = yealink_config._generate_config_content(endpoint_data)
-            
-            # Return the content as plain text
-            return Response(
-                content=config_content,
-                media_type="text/plain"
-            )
-        except Exception as e:
-            logger.error(f"Error fetching endpoint data: {str(e)}")
-            # If we can't get fresh data, fall back to stored config
-            config_content = yealink_config.get_file_content(f"{mac_address}.cfg")
-            if not config_content:
-                raise HTTPException(
-                    status_code=404,
-                    detail=f"Configuration file not found for MAC: {mac_address}"
-                )
-            return Response(
-                content=config_content,
-                media_type="text/plain"
-            )
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Unexpected error in get_mac_record: {str(e)}")
+        logger.error(f"Error getting file content: {str(e)}")
         logger.error(traceback.format_exc())
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to fetch configuration content: {str(e)}"
+            detail=f"Failed to get file content: {str(e)}"
         )
-
-# Phone configuration endpoints
-@config_router.get("/{mac_address}.cfg")
-async def get_phone_config(mac_address: str, db: Session = Depends(get_db)):
-    provisioning = db.query(Provisioning).filter(Provisioning.mac_address == mac_address).first()
-    if not provisioning:
-        raise HTTPException(status_code=404, detail="Configuration not found")
-    
-    if provisioning.make.lower() == "yealink":
-        try:
-            yealink_config = YealinkConfig(
-                connection_string=os.getenv("AZURE_STORAGE_CONNECTION_STRING"),
-                container_name=os.getenv("AZURE_STORAGE_CONTAINER")
-            )
-            # Return the configuration content directly
-            return await yealink_config._generate_config_content(
-                await yealink_config._get_endpoint_data(provisioning.endpoint, os.getenv("BASE_URL"))
-            )
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
-    raise HTTPException(status_code=400, detail="Unsupported phone make")
-
-@config_router.get("/{mac_address}.boot")
-async def get_phone_boot(mac_address: str, db: Session = Depends(get_db)):
-    provisioning = db.query(Provisioning).filter(Provisioning.mac_address == mac_address).first()
-    if not provisioning:
-        raise HTTPException(status_code=404, detail="Configuration not found")
-    
-    if provisioning.make.lower() == "yealink":
-        try:
-            yealink_config = YealinkConfig(
-                connection_string=os.getenv("AZURE_STORAGE_CONNECTION_STRING"),
-                container_name=os.getenv("AZURE_STORAGE_CONTAINER")
-            )
-            return await yealink_config._generate_boot_content(mac_address, os.getenv("BASE_URL"))
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
-    raise HTTPException(status_code=400, detail="Unsupported phone make")
-
-@config_router.get("/y000000000000.cfg")
-async def get_y000_config(db: Session = Depends(get_db)):
-    # This endpoint will return the default Yealink configuration
-    try:
-        yealink_config = YealinkConfig(
-            connection_string=os.getenv("AZURE_STORAGE_CONNECTION_STRING"),
-            container_name=os.getenv("AZURE_STORAGE_CONTAINER")
-        )
-        return await yealink_config._generate_y000_content("000000000000", os.getenv("BASE_URL"))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@prov_router.get("/")
-async def get_provisioning_root():
-    """Root endpoint for provisioning access"""
-    return {
-        "message": "Please provide a MAC address to access configuration files",
-        "example": "/prov/0015651234AP or /prov/0015651234AP.cfg"
-    }
-
-@prov_router.get("/{mac_address}")
-@prov_router.get("/{mac_address}.cfg")
-async def get_provisioning_config(
-    mac_address: str,
-    credentials: HTTPBasicCredentials = Depends(security),
-    request: Request = None,
-    db: Session = Depends(get_db)
-):
-    provisioning = None  # Initialize provisioning variable
-    try:
-        # Log request details
-        logger.info("=== Phone Provisioning Request Details ===")
-        logger.info(f"Request URL: {request.url}")
-        logger.info(f"Request Method: {request.method}")
-        logger.info(f"Request Headers: {dict(request.headers)}")
-        logger.info(f"Client Host: {request.client.host if request.client else 'Unknown'}")
-        logger.info(f"Requested MAC Address: {mac_address}")
-        logger.info("=======================================")
-
-        # Format MAC address: remove extensions and convert to uppercase
-        mac_address = mac_address.replace('.cfg', '').replace('.boot', '').upper()
-        logger.info(f"Processing request for MAC address: {mac_address}")
-        
-        # Skip database operations for special Yealink MAC addresses
-        if mac_address in ['Y000000000000', 'Y000000000107']:
-            logger.info(f"Skipping database operations for special Yealink MAC: {mac_address}")
-            # Initialize Azure Storage client
-            try:
-                logger.info("Initializing Azure Storage client")
-                yealink_config = YealinkConfig(
-                    connection_string=AZURE_STORAGE_CONNECTION_STRING,
-                    container_name=AZURE_STORAGE_CONTAINER
-                )
-                logger.info("Successfully initialized Azure Storage client")
-                
-                # Get the configuration file
-                config_content = yealink_config.get_file_content(f"{mac_address}.cfg")
-                if config_content:
-                    return Response(
-                        content=config_content,
-                        media_type="text/plain; charset=utf-8"
-                    )
-                else:
-                    raise HTTPException(
-                        status_code=404,
-                        detail="Configuration file not found"
-                    )
-            except Exception as e:
-                logger.error(f"Error accessing Azure Storage: {str(e)}")
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"Failed to access configuration file: {str(e)}"
-                )
-        
-        # Get or create provisioning record for normal MAC addresses
-        provisioning = db.query(Provisioning).filter(Provisioning.mac_address == mac_address).first()
-        current_time = datetime.now(ZoneInfo("UTC"))
-        
-        if not provisioning:
-            logger.info(f"Creating new provisioning record for MAC: {mac_address}")
-            # Create new record with just the MAC address
-            provisioning = Provisioning(
-                mac_address=mac_address,
-                endpoint="",  # Empty string for now
-                make="",      # Empty string for now
-                model="",     # Empty string for now
-                username="",  # Empty string for now
-                password="",  # Empty string for now
-                status=True,
-                created_at=current_time,
-                request_date=current_time,  # Set request_date only on first creation
-                last_provisioning_attempt=current_time
-            )
-            db.add(provisioning)
-            db.commit()
-            db.refresh(provisioning)
-            logger.info(f"Created new provisioning record with ID: {provisioning.id}")
-        else:
-            # Update only last_provisioning_attempt for subsequent requests
-            provisioning.last_provisioning_attempt = current_time
-            provisioning.provisioning_request = request.headers.get('user-agent')
-            provisioning.ip_address = request.headers.get('x-forwarded-for')
-            db.commit()
-            logger.info(f"Updated last_provisioning_attempt for MAC: {mac_address}")
-        
-        # Initialize Azure Storage client
-        try:
-            logger.info("Initializing Azure Storage client")
-            logger.info(f"Connection string length: {len(AZURE_STORAGE_CONNECTION_STRING) if AZURE_STORAGE_CONNECTION_STRING else 0}")
-            logger.info(f"Container name: {AZURE_STORAGE_CONTAINER}")
-            
-            yealink_config = YealinkConfig(
-                connection_string=AZURE_STORAGE_CONNECTION_STRING,
-                container_name=AZURE_STORAGE_CONTAINER
-            )
-            logger.info("Successfully initialized Azure Storage client")
-        except Exception as e:
-            logger.error(f"Failed to initialize Azure Storage client: {str(e)}")
-            logger.error(traceback.format_exc())
-            if provisioning:
-                provisioning.provisioning_status = 'FAILED'
-                db.commit()
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to initialize storage connection: {str(e)}"
-            )
-        
-        # Check if file exists in Azure Storage
-        try:
-            logger.info(f"Attempting to get file content for MAC: {mac_address}")
-            config_content = yealink_config.get_file_content(f"{mac_address}.cfg")
-            if config_content:
-                logger.info(f"Successfully retrieved configuration for MAC: {mac_address}")
-                # Update provisioning status to OK
-                provisioning.provisioning_status = 'OK'
-                db.commit()
-                # File exists in Azure, return it directly
-                return Response(
-                    content=config_content,
-                    media_type="text/plain; charset=utf-8"
-                )
-            else:
-                logger.warning(f"No configuration found for MAC: {mac_address}")
-                # Update provisioning status to FAILED
-                provisioning.provisioning_status = 'FAILED'
-                db.commit()
-                # File doesn't exist in Azure
-                raise HTTPException(
-                    status_code=404,
-                    detail="Provisioning config not found. Please create config file to provision this phone."
-                )
-        except HTTPException:
-            if provisioning:
-                provisioning.provisioning_status = 'FAILED'
-                db.commit()
-            raise
-        except Exception as e:
-            logger.error(f"Error accessing Azure Storage: {str(e)}")
-            logger.error(traceback.format_exc())
-            if provisioning:
-                provisioning.provisioning_status = 'FAILED'
-                db.commit()
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to access configuration file: {str(e)}"
-            )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Unexpected error in get_provisioning_config: {str(e)}")
-        logger.error(traceback.format_exc())
-        if provisioning:
-            provisioning.provisioning_status = 'FAILED'
-            db.commit()
-        raise HTTPException(
-            status_code=500,
-            detail=f"Internal server error: {str(e)}"
-        ) 
