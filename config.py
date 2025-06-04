@@ -15,7 +15,7 @@ load_dotenv()
 APP_NAME = "UVLink Platform"
 APP_VERSION = "1.2.0"
 APP_DESCRIPTION = "Dashboard for managing UVLink"
-BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
+BASE_URL = os.getenv("BASE_URL", "https://s1.uvlink.cloud")
 
 # Azure Storage configuration
 AZURE_STORAGE_CONNECTION_STRING = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
@@ -61,8 +61,8 @@ if API_KEY_FILE and Path(API_KEY_FILE).exists():
         API_KEY = f.read().strip()
 
 # Server settings
-SIP_SERVER_HOST = os.getenv("SIP_SERVER_HOST", "s1.uvlink.co.uk")
-HOST = os.getenv("HOST", "0.0.0.0")
+SIP_SERVER_HOST = os.getenv("SIP_SERVER_HOST", "s1.uvlink.cloud")
+HOST = os.getenv("HOST", "s1.uvlink.cloud")
 PORT = int(os.getenv("PORT", 8000))
 LOG_LEVEL = os.getenv("LOG_LEVEL", "info")
 

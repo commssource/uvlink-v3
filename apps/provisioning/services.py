@@ -101,8 +101,8 @@ class YealinkConfig:
             logger.info(f"Fetching endpoint data for ID: {endpoint_id}")
             # Remove trailing slash from base_url if present
             base_url = base_url.rstrip('/')
-            # Construct the full URL
-            url = f"{base_url}/endpoints/{endpoint_id}"
+            # Construct the full URL with /api/v1
+            url = f"{base_url}/api/v1/endpoints/{endpoint_id}"
             logger.info(f"Requesting URL: {url}")
             
             # Add timeout and headers with API key
@@ -117,7 +117,7 @@ class YealinkConfig:
             logger.info(f"With headers: {headers}")
             
             request_start = time.time()
-            timeout = aiohttp.ClientTimeout(total=30)  # 30 seconds total timeout
+            timeout = aiohttp.ClientTimeout(total=30)
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 try:
                     async with session.get(url, headers=headers, ssl=False) as response:

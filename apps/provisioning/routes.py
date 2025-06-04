@@ -618,7 +618,7 @@ async def get_storage_file(
 @router.get("/mac_record/{mac_address}.cfg")
 async def get_mac_record(
     mac_address: str,
-    credentials: HTTPBasicCredentials = Depends(security),
+    authorization: str = Header(None),
     db: Session = Depends(get_db)
 ):
     """Get the content of a configuration file from Azure Storage"""
@@ -627,6 +627,95 @@ async def get_mac_record(
         mac_address = mac_address.replace('.cfg', '')
         logger.info(f"Fetching configuration content for MAC: {mac_address}")
         
+        # Check for authorization header
+        if not authorization:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Missing authorization header"
+            )
+
+        # Parse authorization header
+        try:
+            auth_parts = authorization.split(" ", 1)
+            auth_type = auth_parts[0].lower()
+            auth_value = auth_parts[1] if len(auth_parts) > 1 else None
+
+            if not auth_value:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid authorization format. Use 'Basic <credentials>', 'Bearer <token>' or 'Bearer <api_key>'"
+                )
+
+            if auth_type == "basic":
+                # Handle Basic auth
+                try:
+                    # Decode base64 credentials
+                    decoded = base64.b64decode(auth_value).decode('utf-8')
+                    username, password = decoded.split(':', 1)
+                    
+                    # Get the provisioning record
+                    provisioning = db.query(Provisioning).filter(
+                        Provisioning.mac_address == mac_address
+                    ).first()
+                    
+                    if not provisioning:
+                        raise HTTPException(
+                            status_code=404,
+                            detail=f"Provisioning record not found for MAC: {mac_address}"
+                        )
+
+                    # Verify credentials
+                    if not provisioning.username or not provisioning.password:
+                        raise HTTPException(
+                            status_code=401,
+                            detail="Provisioning record has no credentials configured"
+                        )
+
+                    # Check username and password
+                    if username != provisioning.username or password != provisioning.password:
+                        raise HTTPException(
+                            status_code=401,
+                            detail="Incorrect username or password",
+                            headers={"WWW-Authenticate": "Basic"}
+                        )
+                except Exception as e:
+                    logger.error(f"Basic auth error: {str(e)}")
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="Invalid basic auth credentials",
+                        headers={"WWW-Authenticate": "Basic"}
+                    )
+            elif auth_type == "bearer":
+                # Handle Bearer token (JWT or API key)
+                try:
+                    # Try to verify as JWT first
+                    payload = jwt.decode(auth_value, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+                    if payload.get("type") != "access":
+                        raise HTTPException(
+                            status_code=status.HTTP_401_UNAUTHORIZED,
+                            detail="Invalid token type"
+                        )
+                except jwt.PyJWTError:
+                    # If JWT verification fails, try as API key
+                    if auth_value != API_KEY:
+                        raise HTTPException(
+                            status_code=status.HTTP_401_UNAUTHORIZED,
+                            detail="Invalid token or API key"
+                        )
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid authorization type. Use 'Basic' or 'Bearer'"
+                )
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Authorization parsing error: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid authorization format"
+            )
+
         if not AZURE_STORAGE_CONNECTION_STRING:
             raise HTTPException(
                 status_code=500,
@@ -642,21 +731,6 @@ async def get_mac_record(
             raise HTTPException(
                 status_code=404,
                 detail=f"Provisioning record not found for MAC: {mac_address}"
-            )
-
-        # Verify credentials
-        if not provisioning.username or not provisioning.password:
-            raise HTTPException(
-                status_code=401,
-                detail="Provisioning record has no credentials configured"
-            )
-
-        # Check username and password
-        if credentials.username != provisioning.username or credentials.password != provisioning.password:
-            raise HTTPException(
-                status_code=401,
-                detail="Incorrect username or password",
-                headers={"WWW-Authenticate": "Basic"}
             )
 
         yealink_config = YealinkConfig(

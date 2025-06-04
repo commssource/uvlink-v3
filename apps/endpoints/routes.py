@@ -39,7 +39,7 @@ async def get_endpoint(
         raise HTTPException(status_code=404, detail="Endpoint not found")
     return endpoint
 
-@router.post("/advanced", response_model=StatusResponse)
+@router.post("/", response_model=StatusResponse)
 async def add_endpoint(
     endpoint_data: AdvancedEndpoint,
     auth: Union[str, dict] = Depends(verify_auth)
