@@ -1,19 +1,26 @@
 from fastapi import APIRouter, HTTPException, Depends, Query
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from .schemas import QueueConfig, QueueMember, QueueListResponse
 from .services import QueueService
 from config import ASTERISK_QUEUE_CONFIG
+from shared.auth.endpoint_auth import EndpointAuth
 
 router = APIRouter(
     prefix="/api/v1/queues",
     tags=["queues"]
 )
 
+endpoint_auth = EndpointAuth()
+
 def get_queue_service():
     return QueueService(ASTERISK_QUEUE_CONFIG)
 
 @router.post("/", response_model=bool)
-async def create_queue(queue: QueueConfig, service: QueueService = Depends(get_queue_service)):
+async def create_queue(
+    queue: QueueConfig, 
+    service: QueueService = Depends(get_queue_service),
+    auth: Dict[str, Any] = Depends(endpoint_auth)
+):
     """Create a new queue configuration"""
     success = service.create_queue(queue)
     if not success:
@@ -21,7 +28,11 @@ async def create_queue(queue: QueueConfig, service: QueueService = Depends(get_q
     return success
 
 @router.get("/{queue_name}", response_model=QueueConfig)
-async def get_queue(queue_name: str, service: QueueService = Depends(get_queue_service)):
+async def get_queue(
+    queue_name: str, 
+    service: QueueService = Depends(get_queue_service),
+    auth: Dict[str, Any] = Depends(endpoint_auth)
+):
     """Get queue configuration by name"""
     queue = service.get_queue(queue_name)
     if not queue:
@@ -29,7 +40,12 @@ async def get_queue(queue_name: str, service: QueueService = Depends(get_queue_s
     return queue
 
 @router.put("/{queue_name}", response_model=bool)
-async def update_queue(queue_name: str, queue: QueueConfig, service: QueueService = Depends(get_queue_service)):
+async def update_queue(
+    queue_name: str, 
+    queue: QueueConfig, 
+    service: QueueService = Depends(get_queue_service),
+    auth: Dict[str, Any] = Depends(endpoint_auth)
+):
     """Update an existing queue configuration"""
     # Check if the old queue exists
     old_queue = service.get_queue(queue_name)
@@ -48,7 +64,11 @@ async def update_queue(queue_name: str, queue: QueueConfig, service: QueueServic
     return success
 
 @router.delete("/{queue_name}", response_model=bool)
-async def delete_queue(queue_name: str, service: QueueService = Depends(get_queue_service)):
+async def delete_queue(
+    queue_name: str, 
+    service: QueueService = Depends(get_queue_service),
+    auth: Dict[str, Any] = Depends(endpoint_auth)
+):
     """Delete a queue configuration"""
     success = service.delete_queue(queue_name)
     if not success:
@@ -58,6 +78,7 @@ async def delete_queue(queue_name: str, service: QueueService = Depends(get_queu
 @router.get("/", response_model=QueueListResponse)
 async def list_queues(
     service: QueueService = Depends(get_queue_service),
+    auth: Dict[str, Any] = Depends(endpoint_auth),
     name: Optional[str] = Query(None, description="Filter by queue name"),
     context: Optional[str] = Query(None, description="Filter by queue context"),
     strategy: Optional[str] = Query(None, description="Filter by queue strategy"),

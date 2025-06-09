@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, func, Index
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, func, Index, Text
 from shared.database import Base
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -7,23 +7,23 @@ class Provisioning(Base):
     __tablename__ = "provisioning"
 
     id = Column(Integer, primary_key=True, index=True)
-    endpoint = Column(String(255), nullable=False)
-    make = Column(String(50), nullable=False)
-    model = Column(String(50), nullable=False)
-    mac_address = Column(String(17), nullable=False, unique=True, index=True)
+    mac_address = Column(String(12), unique=True, index=True)
+    endpoint = Column(String(255), nullable=True)  # Allow NULL values
+    make = Column(String(50), nullable=True)       # Allow NULL values
+    model = Column(String(50), nullable=True)      # Allow NULL values
     username = Column(String(50), nullable=False)
     password = Column(String(50), nullable=False)
-    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(ZoneInfo("UTC")), nullable=False)
-    updated_at = Column(DateTime(timezone=True), nullable=True)  # Only set on updates
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     status = Column(Boolean, default=True)
-    approved = Column(Boolean, default=False)  # New field to track if MAC is approved
 
     # New fields for provisioning tracking
-    provisioning_request = Column(String, nullable=True)  # Stores user-agent
-    ip_address = Column(String, nullable=True)  # Stores x-forwarded-for
-    provisioning_status = Column(String, nullable=True)  # Stores 'OK' or 'FAILED'
-    last_provisioning_attempt = Column(DateTime(timezone=True), nullable=True)  # Timestamp of last attempt
-    request_date = Column(DateTime(timezone=True), nullable=True)  # Timestamp of last request
+    device = Column(Text)  # For user agent
+    ip_address = Column(String(45))  # IPv6 addresses can be up to 45 chars
+    provisioning_status = Column(String(20), default="PENDING")  # PENDING, OK, FAILED
+    last_provisioning_attempt = Column(DateTime)
+    request_date = Column(DateTime, default=datetime.utcnow)
+    approved = Column(Boolean, default=False)
 
     # Add an index on mac_address for faster lookups
     __table_args__ = (Index("idx_mac_address", "mac_address"),)

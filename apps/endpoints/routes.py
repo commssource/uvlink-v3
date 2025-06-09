@@ -8,7 +8,7 @@ from .schemas import (
     EndpointValidation, EndpointListResponse
 )
 from .services import AdvancedEndpointService
-from shared.auth import verify_api_key, verify_auth, create_access_token
+from shared.auth.endpoint_auth import EndpointAuth
 from shared.utils import execute_asterisk_command
 from datetime import datetime
 
@@ -16,7 +16,7 @@ router = APIRouter(prefix="/api/v1/endpoints", tags=["endpoints"])
 
 
 @router.get("/", response_model=EndpointListResponse)
-async def list_endpoints(auth: Union[str, dict] = Depends(verify_auth)):
+async def list_endpoints(auth: Dict[str, Any] = Depends(EndpointAuth())):
     """List all endpoints from current configuration"""
     try:
         endpoints = AdvancedEndpointService.list_endpoints()
@@ -31,7 +31,7 @@ async def list_endpoints(auth: Union[str, dict] = Depends(verify_auth)):
 @router.get("/{endpoint_id}", response_model=dict)
 async def get_endpoint(
     endpoint_id: str,
-    auth: Union[str, dict] = Depends(verify_auth)
+    auth: Dict[str, Any] = Depends(EndpointAuth())
 ):
     """Get specific endpoint details"""
     endpoint = AdvancedEndpointService.get_endpoint(endpoint_id)
@@ -42,7 +42,7 @@ async def get_endpoint(
 @router.post("/", response_model=StatusResponse)
 async def add_endpoint(
     endpoint_data: AdvancedEndpoint,
-    auth: Union[str, dict] = Depends(verify_auth)
+    auth: Dict[str, Any] = Depends(EndpointAuth())
 ):
     """Add an endpoint with full configuration"""
     try:
@@ -88,7 +88,11 @@ async def add_endpoint(
         )
 
 @router.put("/{endpoint_id}", response_model=StatusResponse)
-async def update_endpoint(endpoint_id: str, endpoint_data: EndpointUpdate):
+async def update_endpoint(
+    endpoint_id: str,
+    endpoint_data: EndpointUpdate,
+    auth: Dict[str, Any] = Depends(EndpointAuth())
+):
     """Update an existing endpoint"""
     success, message = AdvancedEndpointService.update_endpoint(endpoint_id, endpoint_data)
     if not success:
@@ -98,7 +102,7 @@ async def update_endpoint(endpoint_id: str, endpoint_data: EndpointUpdate):
 @router.delete("/{endpoint_id}", response_model=StatusResponse)
 async def delete_endpoint(
     endpoint_id: str,
-    auth: Union[str, dict] = Depends(verify_auth)
+    auth: Dict[str, Any] = Depends(EndpointAuth())
 ):
     """Delete an endpoint safely (preserves other config)"""
     try:
@@ -113,7 +117,7 @@ async def delete_endpoint(
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/config/current", response_model=ConfigResponse)
-async def get_current_config(auth: Union[str, dict] = Depends(verify_auth)):
+async def get_current_config(auth: Dict[str, Any] = Depends(EndpointAuth())):
     """Get current PJSIP configuration"""
     config_content = AdvancedEndpointService.get_current_config()
     
@@ -126,7 +130,7 @@ async def get_current_config(auth: Union[str, dict] = Depends(verify_auth)):
 @router.get("/validate/{endpoint_id}", response_model=EndpointValidation)
 async def validate_endpoint_id(
     endpoint_id: str,
-    auth: Union[str, dict] = Depends(verify_auth)
+    auth: Dict[str, Any] = Depends(EndpointAuth())
 ):
     """Validate if endpoint ID is available"""
     # Check in config file
@@ -153,7 +157,7 @@ async def validate_endpoint_id(
 @router.post("/validate/data", response_model=Dict[str, Any])
 async def validate_endpoint_data(
     endpoint_json: Dict[str, Any],
-    auth: Union[str, dict] = Depends(verify_auth)
+    auth: Dict[str, Any] = Depends(EndpointAuth())
 ):
     """Validate endpoint data before adding"""
     try:

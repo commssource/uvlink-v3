@@ -2,8 +2,10 @@
 # Updated main.py - Better error handling
 # ============================================================================
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
 import uvicorn
 import logging
 from contextlib import asynccontextmanager
@@ -98,6 +100,15 @@ async def health_check():
         "database": db_status,
         "version": APP_VERSION
     }
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    # Get the first error message
+    error_msg = exc.errors()[0]["msg"]
+    return JSONResponse(
+        status_code=422,
+        content={"detail": error_msg}
+    )
 
 if __name__ == "__main__":
     uvicorn.run(

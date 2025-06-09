@@ -11,11 +11,15 @@ from datetime import timedelta
 # Load environment variables from .env file
 load_dotenv()
 
+# Tenant name
+TENANT_NAME = os.getenv("TENANT_NAME")
+
 # Application settings
 APP_NAME = "UVLink Platform"
 APP_VERSION = "1.2.0"
 APP_DESCRIPTION = "Dashboard for managing UVLink"
 BASE_URL = os.getenv("BASE_URL", "https://s1.uvlink.cloud")
+API_KEY = os.getenv("API_KEY")
 
 # Azure Storage configuration
 AZURE_STORAGE_CONNECTION_STRING = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
@@ -28,6 +32,17 @@ ASTERISK_CONFIG_PATH = os.getenv("ASTERISK_CONFIG_PATH")
 ASTERISK_PJSIP_CONFIG = os.path.join(ASTERISK_CONFIG_PATH, "pjsip.conf")
 ASTERISK_BACKUP_PATH = os.getenv("ASTERISK_BACKUP_PATH")
 ASTERISK_USER = os.getenv("ASTERISK_USER", "asterisk")
+# Asterisk AMI configuration
+AMI_HOST = os.getenv("AMI_HOST", "20.117.180.195")
+AMI_PORT = os.getenv("AMI_PORT", "5038")
+AMI_USERNAME = os.getenv("AMI_USERNAME")
+AMI_SECRET = os.getenv("AMI_SECRET")
+AMI_EVENTS = os.getenv("AMI_EVENTS", "true")
+REGISTRATION_KEY = os.getenv("REGISTRATION_KEY", "1234567890")
+PROVISIONING_USERNAME = os.getenv("PROVISIONING_USERNAME")
+PROVISIONING_PASSWORD = os.getenv("PROVISIONING_PASSWORD")
+
+
 
 # Database configuration
 DB_HOST = os.getenv("DB_HOST", "localhost")
@@ -62,6 +77,7 @@ if API_KEY_FILE and Path(API_KEY_FILE).exists():
 
 # Server settings
 SIP_SERVER_HOST = os.getenv("SIP_SERVER_HOST", "s1.uvlink.cloud")
+SIP_SERVER_PORT = os.getenv("SIP_SERVER_PORT", "5060")
 HOST = os.getenv("HOST", "s1.uvlink.cloud")
 PORT = int(os.getenv("PORT", 8000))
 LOG_LEVEL = os.getenv("LOG_LEVEL", "info")
