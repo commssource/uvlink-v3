@@ -29,7 +29,8 @@ endpoint_auth = EndpointAuth()
 async def create_record(
     record: RecordCreate,
     tenant_name: Optional[str] = Query(None, description="Tenant name override (can also be in request body)"),
-    storage: AzureStorageRecordSaver = Depends(get_storage_saver)
+    storage: AzureStorageRecordSaver = Depends(get_storage_saver),
+    auth: Dict[str, Any] = Depends(endpoint_auth)
 ):
     """Create a new provisioning record"""
     try:
@@ -57,7 +58,8 @@ async def provision_device(
     tenant_name: Optional[str] = Query(None, description="Tenant name override"),
     db: Session = Depends(get_db),
     storage: AzureStorageRecordSaver = Depends(get_storage_saver),
-    uvlink_client: UVLinkAPIClient = Depends(get_uvlink_client)
+    uvlink_client: UVLinkAPIClient = Depends(get_uvlink_client),
+    auth: Dict[str, Any] = Depends(endpoint_auth)
 ):
     """
     Provision a new device:
@@ -206,7 +208,8 @@ async def list_devices(
     limit: int = Query(100, ge=1, le=1000, description="Number of records to return"),
     endpoint: Optional[str] = Query(None, description="Filter by endpoint"),
     make: Optional[str] = Query(None, description="Filter by make"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    auth: Dict[str, Any] = Depends(endpoint_auth)
 ):
     """List all provisioned devices"""
     try:
@@ -232,7 +235,8 @@ async def update_device(
     tenant_name: Optional[str] = Query(None, description="Tenant name override"),
     db: Session = Depends(get_db),
     storage: AzureStorageRecordSaver = Depends(get_storage_saver),
-    uvlink_client: UVLinkAPIClient = Depends(get_uvlink_client)
+    uvlink_client: UVLinkAPIClient = Depends(get_uvlink_client),
+    auth: Dict[str, Any] = Depends(endpoint_auth)
 ):
     """
     Update an existing device by ID or MAC address:
@@ -403,7 +407,8 @@ async def delete_device(
     device_identifier: str,
     tenant_name: Optional[str] = Query(None, description="Tenant name override"),
     db: Session = Depends(get_db),
-    storage: AzureStorageRecordSaver = Depends(get_storage_saver)
+    storage: AzureStorageRecordSaver = Depends(get_storage_saver),
+    auth: Dict[str, Any] = Depends(endpoint_auth)
 ):
     """
     Delete a device by ID or MAC address:
@@ -492,7 +497,7 @@ async def delete_device(
         )
 
 @router.get("/devices/{device_id}", response_model=DeviceResponse)
-async def get_device(device_id: int, db: Session = Depends(get_db)):
+async def get_device(device_id: int, db: Session = Depends(get_db), auth: Dict[str, Any] = Depends(endpoint_auth)):
     """Get a specific device by ID"""
     try:
         device = db.query(ProvisioningDevice).filter(ProvisioningDevice.id == device_id).first()
@@ -512,7 +517,8 @@ async def get_device(device_id: int, db: Session = Depends(get_db)):
 async def delete_device(
     device_id: int,
     db: Session = Depends(get_db),
-    storage: AzureStorageRecordSaver = Depends(get_storage_saver)
+    storage: AzureStorageRecordSaver = Depends(get_storage_saver),
+    auth: Dict[str, Any] = Depends(endpoint_auth)
 ):
     """Delete a device and its config file"""
     try:
@@ -561,10 +567,11 @@ async def health_check():
             "error": str(e)
         }
 
-@router.get("/prov", response_model=List[RecordListItem])
+@router.get("/records", response_model=List[RecordListItem])
 async def list_records(
     tenant_name: Optional[str] = Query(None, description="Tenant name override"),
-    storage: AzureStorageRecordSaver = Depends(get_storage_saver)
+    storage: AzureStorageRecordSaver = Depends(get_storage_saver),
+    auth: Dict[str, Any] = Depends(verify_combined_auth)
 ):
     """List all provisioning records for a tenant"""
     try:
