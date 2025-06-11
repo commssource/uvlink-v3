@@ -42,5 +42,13 @@ class ProvisioningDevice(Base):
     status = Column(Boolean, nullable=False, default=True)
     username = Column(String(100), nullable=False)
     password = Column(String(100), nullable=False)
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    device = Column(Text)  # For user agent
+    ip_address = Column(String(45))  # IPv6 addresses can be up to 45 chars
+    provisioning_status = Column(String(20), default="PENDING")  # PENDING, OK, FAILED
+    last_provisioning_attempt = Column(DateTime)
+    request_date = Column(DateTime, default=datetime.utcnow)
+    approved = Column(Boolean, default=False)
+    
+    # Enhanced timestamp columns
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)

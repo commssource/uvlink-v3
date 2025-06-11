@@ -7,7 +7,7 @@ from fastapi.responses import PlainTextResponse
 from shared.database import get_db
 from shared.auth.endpoint_auth import EndpointAuth
 from shared.auth.combined_auth import verify_combined_auth
-from .schemas import DeviceProvisionRequest, DeviceResponse, DeviceUpdateRequest, PaginatedRecordsResponse
+from .schemas import DeviceItem, DeviceProvisionRequest, DeviceResponse, DeviceUpdateRequest, PaginatedRecordsResponse, PaginatedRecordsResponse, PaginatedDevicesResponse
 from .models import ProvisioningDevice
 from .uvlink_client import UVLinkAPIClient, get_uvlink_client, map_endpoint_to_config
 from typing import List, TypeVar, Generic, Optional, Dict, Any
@@ -776,3 +776,663 @@ async def check_record_exists(
     except Exception as e:
         logger.error(f"Error checking record existence: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to check record existence: {str(e)}")
+    
+
+# Enhanced database routes with all fields
+
+# Enhanced database routes with all fields
+
+@router.get("/database/devices", response_model=PaginatedDevicesResponse)
+async def list_database_devices(
+    # Pagination parameters
+    page: int = Query(1, ge=1, description="Page number"),
+    per_page: int = Query(50, ge=1, le=500, description="Items per page"),
+    
+    # Filtering parameters - Updated with all fields
+    endpoint: Optional[str] = Query(None, description="Filter by endpoint"),
+    make: Optional[str] = Query(None, description="Filter by make"),
+    model: Optional[str] = Query(None, description="Filter by model"),
+    mac_address: Optional[str] = Query(None, description="Filter by MAC address"),
+    device: Optional[str] = Query(None, description="Filter by device name"),
+    status: Optional[bool] = Query(None, description="Filter by status"),
+    provisioning_status: Optional[str] = Query(None, description="Filter by provisioning status"),
+    approved: Optional[bool] = Query(None, description="Filter by approved status"),
+    ip_address: Optional[str] = Query(None, description="Filter by IP address"),
+    username: Optional[str] = Query(None, description="Filter by username"),
+    
+    # Dependencies
+    db: Session = Depends(get_db),
+    auth: Dict[str, Any] = Depends(verify_combined_auth)
+):
+    """List all provisioned devices with enhanced filtering"""
+    try:
+        # Start with base query
+        query = db.query(ProvisioningDevice)
+        
+        # Apply all filters - FIXED Boolean filtering
+        if endpoint:
+            query = query.filter(ProvisioningDevice.endpoint.ilike(f"%{endpoint}%"))
+        if make:
+            query = query.filter(ProvisioningDevice.make.ilike(f"%{make}%"))
+        if model:
+            query = query.filter(ProvisioningDevice.model.ilike(f"%{model}%"))
+        if mac_address:
+            query = query.filter(ProvisioningDevice.mac_address.ilike(f"%{mac_address}%"))
+        if device:
+            query = query.filter(ProvisioningDevice.device.ilike(f"%{device}%"))
+        if status is not None:
+            query = query.filter(ProvisioningDevice.status == status)
+        if provisioning_status:
+            query = query.filter(ProvisioningDevice.provisioning_status.ilike(f"%{provisioning_status}%"))
+        
+        # FIXED: Proper boolean filtering for approved field
+        if approved is not None:
+            if approved:
+                # When approved=true, only show records where approved IS true (not NULL)
+                query = query.filter(ProvisioningDevice.approved == True)
+            else:
+                # When approved=false, show records where approved IS false OR NULL
+                query = query.filter(
+                    (ProvisioningDevice.approved == False) | 
+                    (ProvisioningDevice.approved.is_(None))
+                )
+        
+        if ip_address:
+            query = query.filter(ProvisioningDevice.ip_address.ilike(f"%{ip_address}%"))
+        if username:
+            query = query.filter(ProvisioningDevice.username.ilike(f"%{username}%"))
+        
+        # Get total count
+        total_count = query.count()
+        total_pages = (total_count + per_page - 1) // per_page if total_count > 0 else 1
+        offset = (page - 1) * per_page
+        
+        # Apply pagination and ordering
+        devices = query.order_by(ProvisioningDevice.created_at.desc()).offset(offset).limit(per_page).all()
+        
+        # Convert to response items with all fields
+        device_items = []
+        for device in devices:
+            item = DeviceItem(
+                id=device.id,
+                endpoint=device.endpoint,
+                make=device.make,
+                model=device.model,
+                mac_address=device.mac_address,
+                device=device.device,
+                status=device.status,
+                provisioning_status=device.provisioning_status,
+                approved=device.approved,
+                ip_address=device.ip_address,
+                username=device.username,
+                password=device.password,
+                created_at=device.created_at,      # Will be auto-formatted to UK
+                updated_at=device.updated_at,     # Will be auto-formatted to UK
+                request_date=device.request_date, # Will be auto-formatted to UK
+                last_provisioning_attempt=device.last_provisioning_attempt, # Will be auto-formatted to UK
+                config_file_url=None
+            )
+            device_items.append(item)
+        
+        response = PaginatedDevicesResponse(
+            items=device_items,
+            total=total_count,
+            page=page,
+            per_page=per_page,
+            total_pages=total_pages,
+            has_next=page < total_pages,
+            has_prev=page > 1
+        )
+        
+        return response
+        
+    except Exception as e:
+        logger.error(f"Error listing database devices: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to list devices: {str(e)}")
+
+# Example enhanced filtering endpoints - FIXED
+@router.get("/database/devices/pending", response_model=PaginatedDevicesResponse)
+async def list_pending_devices(
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=1, le=500),
+    db: Session = Depends(get_db),
+    auth: Dict[str, Any] = Depends(verify_combined_auth)
+):
+    """List devices with pending provisioning status"""
+    try:
+        # Start with base query
+        query = db.query(ProvisioningDevice)
+        
+        # Filter for pending status
+        query = query.filter(ProvisioningDevice.provisioning_status.ilike("%pending%"))
+        
+        # Get total count
+        total_count = query.count()
+        total_pages = (total_count + per_page - 1) // per_page if total_count > 0 else 1
+        offset = (page - 1) * per_page
+        
+        # Apply pagination and ordering
+        devices = query.order_by(ProvisioningDevice.created_at.desc()).offset(offset).limit(per_page).all()
+        
+        # Convert to response items
+        device_items = []
+        for device in devices:
+            item = DeviceItem(
+                id=device.id,
+                endpoint=device.endpoint,
+                make=device.make,
+                model=device.model,
+                mac_address=device.mac_address,
+                device=device.device,
+                status=device.status,
+                provisioning_status=device.provisioning_status,
+                approved=device.approved,
+                ip_address=device.ip_address,
+                username=device.username,
+                password=device.password,
+                created_at=device.created_at,
+                updated_at=device.updated_at,
+                request_date=device.request_date,
+                last_provisioning_attempt=device.last_provisioning_attempt,
+                config_file_url=None
+            )
+            device_items.append(item)
+        
+        response = PaginatedDevicesResponse(
+            items=device_items,
+            total=total_count,
+            page=page,
+            per_page=per_page,
+            total_pages=total_pages,
+            has_next=page < total_pages,
+            has_prev=page > 1
+        )
+        
+        return response
+        
+    except Exception as e:
+        logger.error(f"Error listing pending devices: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to list pending devices: {str(e)}")
+
+@router.get("/database/devices/approved", response_model=PaginatedDevicesResponse)
+async def list_approved_devices(
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=1, le=500),
+    db: Session = Depends(get_db),
+    auth: Dict[str, Any] = Depends(verify_combined_auth)
+):
+    """List approved devices only"""
+    try:
+        # Start with base query
+        query = db.query(ProvisioningDevice)
+        
+        # Filter for approved devices only (excludes NULL)
+        query = query.filter(ProvisioningDevice.approved == True)
+        
+        # Get total count
+        total_count = query.count()
+        total_pages = (total_count + per_page - 1) // per_page if total_count > 0 else 1
+        offset = (page - 1) * per_page
+        
+        # Apply pagination and ordering
+        devices = query.order_by(ProvisioningDevice.created_at.desc()).offset(offset).limit(per_page).all()
+        
+        # Convert to response items
+        device_items = []
+        for device in devices:
+            item = DeviceItem(
+                id=device.id,
+                endpoint=device.endpoint,
+                make=device.make,
+                model=device.model,
+                mac_address=device.mac_address,
+                device=device.device,
+                status=device.status,
+                provisioning_status=device.provisioning_status,
+                approved=device.approved,
+                ip_address=device.ip_address,
+                username=device.username,
+                password=device.password,
+                created_at=device.created_at,
+                updated_at=device.updated_at,
+                request_date=device.request_date,
+                last_provisioning_attempt=device.last_provisioning_attempt,
+                config_file_url=None
+            )
+            device_items.append(item)
+        
+        response = PaginatedDevicesResponse(
+            items=device_items,
+            total=total_count,
+            page=page,
+            per_page=per_page,
+            total_pages=total_pages,
+            has_next=page < total_pages,
+            has_prev=page > 1
+        )
+        
+        return response
+        
+    except Exception as e:
+        logger.error(f"Error listing approved devices: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to list approved devices: {str(e)}")
+
+# Update and Delete endpoints for database devices
+
+@router.put("/database/devices/{device_identifier}", response_model=DeviceItem)
+async def update_database_device(
+    device_identifier: str,
+    device_update: DeviceUpdateRequest,
+    db: Session = Depends(get_db),
+    auth: Dict[str, Any] = Depends(verify_combined_auth)
+):
+    """
+    Update a device in the database by ID or MAC address
+    
+    Args:
+        device_identifier: Either device ID (numeric) or MAC address (string)
+        device_update: Fields to update
+    """
+    try:
+        # Determine if identifier is ID (numeric) or MAC address (string)
+        if device_identifier.isdigit():
+            device = db.query(ProvisioningDevice).filter(
+                ProvisioningDevice.id == int(device_identifier)
+            ).first()
+            identifier_type = "ID"
+        else:
+            device = db.query(ProvisioningDevice).filter(
+                ProvisioningDevice.mac_address == device_identifier
+            ).first()
+            identifier_type = "MAC address"
+        
+        if not device:
+            raise HTTPException(
+                status_code=404, 
+                detail=f"Device not found with {identifier_type}: {device_identifier}"
+            )
+        
+        # Check if new MAC address conflicts with another device
+        if device_update.mac_address and device_update.mac_address != device.mac_address:
+            existing_mac = db.query(ProvisioningDevice).filter(
+                ProvisioningDevice.mac_address == device_update.mac_address,
+                ProvisioningDevice.id != device.id
+            ).first()
+            
+            if existing_mac:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"MAC address {device_update.mac_address} already exists for another device"
+                )
+        
+        # Update device fields
+        update_data = device_update.dict(exclude_unset=True)
+        for field, value in update_data.items():
+            if hasattr(device, field):
+                setattr(device, field, value)
+        
+        # Commit changes
+        try:
+            db.commit()
+            db.refresh(device)
+            print(f"Updated device in database: ID {device.id}")
+            
+        except Exception as e:
+            db.rollback()
+            print(f"Failed to update device in database: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to update device in database: {str(e)}"
+            )
+        
+        # Return updated device
+        return DeviceItem(
+            id=device.id,
+            endpoint=device.endpoint,
+            make=device.make,
+            model=device.model,
+            mac_address=device.mac_address,
+            device=device.device,
+            status=device.status,
+            provisioning_status=device.provisioning_status,
+            approved=device.approved,
+            ip_address=device.ip_address,
+            username=device.username,
+            password=device.password,
+            created_at=device.created_at,
+            updated_at=device.updated_at,
+            request_date=device.request_date,
+            last_provisioning_attempt=device.last_provisioning_attempt,
+            config_file_url=None
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating database device: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to update device: {str(e)}")
+
+@router.delete("/database/devices/{device_identifier}")
+async def delete_database_device(
+    device_identifier: str,
+    delete_config_file: bool = Query(False, description="Also delete the config file from Azure Storage"),
+    tenant_name: Optional[str] = Query(None, description="Tenant name for config file deletion"),
+    db: Session = Depends(get_db),
+    storage: AzureStorageRecordSaver = Depends(get_storage_saver),
+    auth: Dict[str, Any] = Depends(verify_combined_auth)
+):
+    """
+    Delete a device from database by ID or MAC address
+    
+    Args:
+        device_identifier: Either device ID (numeric) or MAC address (string)
+        delete_config_file: Whether to also delete the config file from Azure Storage
+        tenant_name: Tenant name override for config file deletion
+    """
+    try:
+        # Override tenant if provided
+        if tenant_name:
+            storage = AzureStorageRecordSaver(tenant_name=tenant_name)
+        
+        # Determine if identifier is ID (numeric) or MAC address (string)
+        if device_identifier.isdigit():
+            device = db.query(ProvisioningDevice).filter(
+                ProvisioningDevice.id == int(device_identifier)
+            ).first()
+            identifier_type = "ID"
+        else:
+            device = db.query(ProvisioningDevice).filter(
+                ProvisioningDevice.mac_address == device_identifier
+            ).first()
+            identifier_type = "MAC address"
+        
+        if not device:
+            raise HTTPException(
+                status_code=404, 
+                detail=f"Device not found with {identifier_type}: {device_identifier}"
+            )
+        
+        # Store device info for response
+        device_info = {
+            'id': device.id,
+            'endpoint': device.endpoint,
+            'mac_address': device.mac_address,
+            'make': device.make,
+            'model': device.model
+        }
+        
+        config_file_deleted = False
+        config_file_error = None
+        
+        # Delete config file from Azure Storage if requested
+        if delete_config_file:
+            try:
+                filename = f"{device.mac_address}.cfg"
+                file_deleted = await storage.delete_record(filename)
+                if file_deleted:
+                    config_file_deleted = True
+                    print(f"Deleted config file: {filename}")
+                else:
+                    config_file_error = f"Config file {filename} not found in storage"
+                    print(config_file_error)
+            except Exception as e:
+                config_file_error = f"Failed to delete config file: {str(e)}"
+                print(f"Warning: {config_file_error}")
+                # Continue with database deletion even if file deletion fails
+        
+        # Delete device from database
+        try:
+            db.delete(device)
+            db.commit()
+            print(f"Deleted device from database: ID {device_info['id']}")
+            
+        except Exception as e:
+            db.rollback()
+            print(f"Failed to delete device from database: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to delete device from database: {str(e)}"
+            )
+        
+        # Prepare response
+        response = {
+            "message": f"Device {device_info['id']} ({device_info['make']} {device_info['model']}, endpoint {device_info['endpoint']}, MAC {device_info['mac_address']}) deleted successfully",
+            "deleted_device": device_info,
+            "identifier_used": f"{identifier_type}: {device_identifier}",
+            "config_file_deleted": config_file_deleted
+        }
+        
+        if config_file_error:
+            response["config_file_error"] = config_file_error
+        elif delete_config_file and config_file_deleted:
+            response["config_file_name"] = f"{device.mac_address}.cfg"
+        
+        return response
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting database device: {e}")
+        try:
+            db.rollback()
+        except:
+            pass
+        raise HTTPException(status_code=500, detail=f"Failed to delete device: {str(e)}")
+
+# Bulk operations
+@router.put("/database/devices/bulk-update")
+async def bulk_update_devices(
+    device_ids: List[int],
+    device_update: DeviceUpdateRequest,
+    db: Session = Depends(get_db),
+    auth: Dict[str, Any] = Depends(verify_combined_auth)
+):
+    """
+    Update multiple devices at once
+    
+    Args:
+        device_ids: List of device IDs to update
+        device_update: Fields to update for all devices
+    """
+    try:
+        # Get all devices
+        devices = db.query(ProvisioningDevice).filter(
+            ProvisioningDevice.id.in_(device_ids)
+        ).all()
+        
+        if not devices:
+            raise HTTPException(status_code=404, detail="No devices found with provided IDs")
+        
+        updated_count = 0
+        update_data = device_update.dict(exclude_unset=True)
+        
+        # Update each device
+        for device in devices:
+            for field, value in update_data.items():
+                if hasattr(device, field):
+                    setattr(device, field, value)
+            updated_count += 1
+        
+        # Commit all changes
+        try:
+            db.commit()
+            print(f"Bulk updated {updated_count} devices")
+            
+        except Exception as e:
+            db.rollback()
+            print(f"Failed to bulk update devices: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to update devices: {str(e)}"
+            )
+        
+        return {
+            "message": f"Successfully updated {updated_count} devices",
+            "updated_devices": [device.id for device in devices],
+            "updated_fields": list(update_data.keys())
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error bulk updating devices: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to bulk update devices: {str(e)}")
+
+@router.delete("/database/devices/bulk-delete")
+async def bulk_delete_devices(
+    device_ids: List[int],
+    delete_config_files: bool = Query(False, description="Also delete config files from Azure Storage"),
+    tenant_name: Optional[str] = Query(None, description="Tenant name for config file deletion"),
+    db: Session = Depends(get_db),
+    storage: AzureStorageRecordSaver = Depends(get_storage_saver),
+    auth: Dict[str, Any] = Depends(verify_combined_auth)
+):
+    """
+    Delete multiple devices at once
+    
+    Args:
+        device_ids: List of device IDs to delete
+        delete_config_files: Whether to also delete config files from Azure Storage
+        tenant_name: Tenant name override for config file deletion
+    """
+    try:
+        # Override tenant if provided
+        if tenant_name:
+            storage = AzureStorageRecordSaver(tenant_name=tenant_name)
+        
+        # Get all devices
+        devices = db.query(ProvisioningDevice).filter(
+            ProvisioningDevice.id.in_(device_ids)
+        ).all()
+        
+        if not devices:
+            raise HTTPException(status_code=404, detail="No devices found with provided IDs")
+        
+        deleted_devices = []
+        config_files_deleted = []
+        config_file_errors = []
+        
+        # Delete config files if requested
+        if delete_config_files:
+            for device in devices:
+                try:
+                    filename = f"{device.mac_address}.cfg"
+                    file_deleted = await storage.delete_record(filename)
+                    if file_deleted:
+                        config_files_deleted.append(filename)
+                    else:
+                        config_file_errors.append(f"{filename}: not found")
+                except Exception as e:
+                    config_file_errors.append(f"{device.mac_address}.cfg: {str(e)}")
+        
+        # Delete devices from database
+        for device in devices:
+            deleted_devices.append({
+                'id': device.id,
+                'endpoint': device.endpoint,
+                'mac_address': device.mac_address,
+                'make': device.make,
+                'model': device.model
+            })
+            db.delete(device)
+        
+        # Commit all deletions
+        try:
+            db.commit()
+            print(f"Bulk deleted {len(deleted_devices)} devices")
+            
+        except Exception as e:
+            db.rollback()
+            print(f"Failed to bulk delete devices: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to delete devices: {str(e)}"
+            )
+        
+        response = {
+            "message": f"Successfully deleted {len(deleted_devices)} devices",
+            "deleted_devices": deleted_devices,
+            "config_files_deleted": len(config_files_deleted),
+            "config_file_names": config_files_deleted
+        }
+        
+        if config_file_errors:
+            response["config_file_errors"] = config_file_errors
+        
+        return response
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error bulk deleting devices: {e}")
+        try:
+            db.rollback()
+        except:
+            pass
+        raise HTTPException(status_code=500, detail=f"Failed to bulk delete devices: {str(e)}")
+
+@router.get("/database/devices/not-approved", response_model=PaginatedDevicesResponse)
+async def list_not_approved_devices(
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=1, le=500),
+    db: Session = Depends(get_db),
+    auth: Dict[str, Any] = Depends(verify_combined_auth)
+):
+    """List devices that are not approved (false or NULL)"""
+    try:
+        # Start with base query
+        query = db.query(ProvisioningDevice)
+        
+        # Filter for not approved devices (false OR NULL)
+        query = query.filter(
+            (ProvisioningDevice.approved == False) | 
+            (ProvisioningDevice.approved.is_(None))
+        )
+        
+        # Get total count
+        total_count = query.count()
+        total_pages = (total_count + per_page - 1) // per_page if total_count > 0 else 1
+        offset = (page - 1) * per_page
+        
+        # Apply pagination and ordering
+        devices = query.order_by(ProvisioningDevice.created_at.desc()).offset(offset).limit(per_page).all()
+        
+        # Convert to response items
+        device_items = []
+        for device in devices:
+            item = DeviceItem(
+                id=device.id,
+                endpoint=device.endpoint,
+                make=device.make,
+                model=device.model,
+                mac_address=device.mac_address,
+                device=device.device,
+                status=device.status,
+                provisioning_status=device.provisioning_status,
+                approved=device.approved,
+                ip_address=device.ip_address,
+                username=device.username,
+                password=device.password,
+                created_at=device.created_at,
+                updated_at=device.updated_at,
+                request_date=device.request_date,
+                last_provisioning_attempt=device.last_provisioning_attempt,
+                config_file_url=None
+            )
+            device_items.append(item)
+        
+        response = PaginatedDevicesResponse(
+            items=device_items,
+            total=total_count,
+            page=page,
+            per_page=per_page,
+            total_pages=total_pages,
+            has_next=page < total_pages,
+            has_prev=page > 1
+        )
+        
+        return response
+        
+    except Exception as e:
+        logger.error(f"Error listing not approved devices: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to list not approved devices: {str(e)}")
