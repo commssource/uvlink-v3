@@ -7,7 +7,7 @@ from fastapi.responses import PlainTextResponse
 from shared.database import get_db
 from shared.auth.endpoint_auth import EndpointAuth
 from shared.auth.combined_auth import verify_combined_auth
-from .schemas import DeviceProvisionRequest, DeviceResponse, DeviceUpdateRequest
+from .schemas import DeviceProvisionRequest, DeviceResponse, DeviceUpdateRequest, PaginatedRecordsResponse
 from .models import ProvisioningDevice
 from .uvlink_client import UVLinkAPIClient, get_uvlink_client, map_endpoint_to_config
 from typing import List, TypeVar, Generic, Optional, Dict, Any
@@ -567,13 +567,16 @@ async def health_check():
             "error": str(e)
         }
 
-@router.get("/records", response_model=List[RecordListItem])
+@router.get("/records", response_model=PaginatedRecordsResponse)
 async def list_records(
     tenant_name: Optional[str] = Query(None, description="Tenant name override"),
+    filename: Optional[str] = Query(None, description="Filter by filename (supports partial matching)"),
+    page: int = Query(1, ge=1, description="Page number (starts from 1)"),
+    per_page: int = Query(50, ge=1, le=500, description="Items per page (max 500)"),
     storage: AzureStorageRecordSaver = Depends(get_storage_saver),
     auth: Dict[str, Any] = Depends(verify_combined_auth)
 ):
-    """List all provisioning records for a tenant"""
+    """List all provisioning records for a tenant with optional filename filtering and pagination"""
     try:
         # Override tenant if provided
         if tenant_name:
@@ -581,8 +584,17 @@ async def list_records(
         
         records = await storage.list_records()
         
+        # Debug logging
+        if filename:
+            print(f"=== FILENAME FILTERING DEBUG ===")
+            print(f"Filter parameter: '{filename}'")
+            print(f"Total records before filtering: {len(records)}")
+            for i, record in enumerate(records[:3]):  # Show first 3 records
+                print(f"Record {i} structure: {record}")
+            print(f"================================")
+        
         # Convert datetime to string for JSON serialization and handle None values
-        serialized_records = []
+        filtered_records = []
         for record in records:
             # Create a copy to avoid modifying the original
             record_copy = record.copy()
@@ -600,9 +612,53 @@ async def list_records(
             record_copy.setdefault('url', '')
             record_copy.setdefault('tenant', storage.tenant_name)
             
-            serialized_records.append(record_copy)
+            # Apply filename filtering if provided
+            if filename:
+                record_filename = record_copy.get('filename', '')
+                
+                # Debug individual record
+                print(f"Checking record filename: '{record_filename}' against filter: '{filename}'")
+                
+                # Case-insensitive partial matching
+                if filename.lower() not in record_filename.lower():
+                    print(f"SKIPPING: '{record_filename}' does not contain '{filename}'")
+                    continue  # Skip this record if filename doesn't match
+                else:
+                    print(f"MATCHED: '{record_filename}' contains '{filename}'")
+            
+            filtered_records.append(record_copy)
         
-        return [RecordListItem(**record) for record in serialized_records]
+        if filename:
+            print(f"Total records after filtering: {len(filtered_records)}")
+        
+        # Calculate pagination
+        total_records = len(filtered_records)
+        total_pages = (total_records + per_page - 1) // per_page  # Ceiling division
+        
+        # Calculate start and end indices for pagination
+        start_index = (page - 1) * per_page
+        end_index = start_index + per_page
+        
+        # Get paginated records
+        paginated_records = filtered_records[start_index:end_index]
+        
+        # Convert to RecordListItem objects
+        record_items = [RecordListItem(**record) for record in paginated_records]
+        
+        # Create pagination response
+        response = PaginatedRecordsResponse(
+            items=record_items,
+            total=total_records,
+            page=page,
+            per_page=per_page,
+            total_pages=total_pages,
+            has_next=page < total_pages,
+            has_prev=page > 1
+        )
+        
+        print(f"Pagination: Page {page}/{total_pages}, showing {len(record_items)} of {total_records} total records")
+        
+        return response
         
     except Exception as e:
         logger.error(f"Error listing records: {e}")

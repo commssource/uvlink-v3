@@ -203,3 +203,12 @@ class RecordListItem(BaseModel):
 
 class RecordContent(BaseModel):
     content: str
+
+class PaginatedRecordsResponse(BaseModel):
+    items: List[RecordListItem]
+    total: int
+    page: int
+    per_page: int
+    total_pages: int
+    has_next: bool
+    has_prev: bool
