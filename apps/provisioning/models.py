@@ -4,7 +4,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 class Provisioning(Base):
-    __tablename__ = "provisioning"
+    __tablename__ = "provisioning_ignore"
 
     id = Column(Integer, primary_key=True, index=True)
     mac_address = Column(String(12), unique=True, index=True)
@@ -30,3 +30,17 @@ class Provisioning(Base):
 
     def __repr__(self):
         return f"<Provisioning(id={self.id}, mac_address={self.mac_address}, status={self.status}, approved={self.approved})>" 
+    
+#==============================Provisioning Device===========================
+class ProvisioningDevice(Base):
+    __tablename__ = "provisioning"
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    endpoint = Column(String(50), nullable=False, index=True)
+    make = Column(String(50), nullable=False)
+    model = Column(String(50), nullable=False)
+    mac_address = Column(String(17), nullable=False, unique=True, index=True)  # MAC address format: XX:XX:XX:XX:XX:XX
+    status = Column(Boolean, nullable=False, default=True)
+    username = Column(String(100), nullable=False)
+    password = Column(String(100), nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

@@ -113,7 +113,7 @@ class MACAddressStorage:
                     'username': data.username,
                     'password': data.password,
                     'status': data.status,
-                    'provisioning_request': data.provisioning_request,
+                    #'provisioning_request': data.provisioning_request,
                     'ip_address': data.ip_address,
                     'provisioning_status': data.provisioning_status,
                     'request_date': data.request_date,
