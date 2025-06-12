@@ -20,10 +20,12 @@ async def list_endpoints(auth: Dict[str, Any] = Depends(EndpointAuth())):
     """List all endpoints from current configuration"""
     try:
         endpoints = AdvancedEndpointService.list_endpoints()
+        # Sort endpoints by endpoint_id (using dictionary key)
+        sorted_endpoints = sorted(endpoints, key=lambda x: x['id'])
         return EndpointListResponse(
             success=True,
-            count=len(endpoints),
-            endpoints=endpoints
+            count=len(sorted_endpoints),
+            endpoints=sorted_endpoints
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
