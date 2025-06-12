@@ -11,7 +11,7 @@ from .schemas import (
     AdvancedEndpoint, EndpointUpdate
 )
 from .config_parser import AdvancedPJSIPConfigParser
-from shared.utils.asterisk import execute_asterisk_command
+from shared.utils import execute_asterisk_command
 from config import ASTERISK_PJSIP_CONFIG
 
 logger = logging.getLogger(__name__)

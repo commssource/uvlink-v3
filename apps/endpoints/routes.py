@@ -9,7 +9,7 @@ from .schemas import (
 )
 from .services import AdvancedEndpointService
 from shared.auth.endpoint_auth import EndpointAuth
-from shared.utils.asterisk import execute_asterisk_command
+from shared.utils import execute_asterisk_command
 from datetime import datetime
 
 router = APIRouter(prefix="/api/v1/endpoints", tags=["endpoints"])
