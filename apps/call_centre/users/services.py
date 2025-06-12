@@ -126,17 +126,17 @@ class CallCentreUserService:
                 detail=f"Failed to update user: {str(e)}"
             )
 
-    async def delete_user(self, user_id: str) -> None:
-        """Delete a call centre user"""
+    async def delete_user(self, id: int) -> None:
+        """Delete a call centre user by ID"""
         try:
             db_user = self.db.query(models.CallCentreUser).filter(
-                models.CallCentreUser.user_id == user_id
+                models.CallCentreUser.id == id
             ).first()
             
             if not db_user:
                 raise HTTPException(
                     status_code=404,
-                    detail=f"User with ID {user_id} not found"
+                    detail=f"User with ID {id} not found"
                 )
             
             self.db.delete(db_user)
@@ -146,7 +146,6 @@ class CallCentreUserService:
             raise
         except Exception as e:
             self.db.rollback()
-            logger.error(f"Error deleting user: {str(e)}")
             raise HTTPException(
                 status_code=500,
                 detail=f"Failed to delete user: {str(e)}"
@@ -154,13 +153,16 @@ class CallCentreUserService:
 
     async def list_users(
         self,
+        skip: int = 0,
+        limit: int = 10,
         status: Optional[int] = None,
         user_id: Optional[str] = None,
         user_name: Optional[str] = None,
         email: Optional[str] = None
-    ) -> List[schemas.CallCentreUserResponse]:
-        """List all call centre users with optional filters"""
+    ) -> schemas.PaginatedUserResponse:
+        """List all call centre users with pagination and optional filters"""
         try:
+            # Build the base query
             query = self.db.query(models.CallCentreUser)
             
             # Apply filters if provided
@@ -173,8 +175,25 @@ class CallCentreUserService:
             if email:
                 query = query.filter(models.CallCentreUser.email == email)
             
-            users = query.all()
-            return [schemas.CallCentreUserResponse.model_validate(user) for user in users]
+            # Get total count
+            total = query.count()
+            
+            # Apply pagination
+            users = query.offset(skip).limit(limit).all()
+            
+            # Calculate total pages
+            pages = (total + limit - 1) // limit
+            
+            # Calculate current page
+            current_page = (skip // limit) + 1
+            
+            return schemas.PaginatedUserResponse(
+                items=[schemas.CallCentreUserResponse.model_validate(user) for user in users],
+                total=total,
+                page=current_page,
+                size=limit,
+                pages=pages
+            )
             
         except Exception as e:
             logger.error(f"Error listing users: {str(e)}")
@@ -268,3 +287,18 @@ class CallCentreUserService:
         except Exception as e:
             logger.error(f"Database debug error: {str(e)}")
             raise
+
+    async def debug_list_users(self) -> List[schemas.CallCentreUserResponse]:
+        """Debug method to list all users with their IDs"""
+        try:
+            users = self.db.query(models.CallCentreUser).all()
+            logger.info(f"Total users in database: {len(users)}")
+            for user in users:
+                logger.info(f"User: ID={user.id}, user_id={user.user_id}, user_name={user.user_name}")
+            return [schemas.CallCentreUserResponse.model_validate(user) for user in users]
+        except Exception as e:
+            logger.error(f"Error in debug_list_users: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to list users: {str(e)}"
+            )

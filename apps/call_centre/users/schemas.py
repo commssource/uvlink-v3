@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr, field_validator
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 
 class CallCentreUserBase(BaseModel):
@@ -44,3 +44,10 @@ class CallCentreUserResponse(CallCentreUserBase):
 
     class Config:
         from_attributes = True
+
+class PaginatedUserResponse(BaseModel):
+    items: List[CallCentreUserResponse]
+    total: int
+    page: int
+    size: int
+    pages: int
