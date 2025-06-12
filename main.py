@@ -9,6 +9,7 @@ from fastapi.exceptions import RequestValidationError
 import uvicorn
 import logging
 from contextlib import asynccontextmanager
+from apps.call_centre.users.routes import router as users_routes
 
 from config import (
     APP_NAME, APP_VERSION, APP_DESCRIPTION,
@@ -62,6 +63,7 @@ app.add_middleware(
 
 try:
     # Include routers
+    app.include_router(users_routes)
     app.include_router(endpoints_router)
     app.include_router(auth_router)
     app.include_router(provisioning_router)
