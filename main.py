@@ -13,7 +13,7 @@ from apps.call_centre.users.routes import router as users_routes
 
 from config import (
     APP_NAME, APP_VERSION, APP_DESCRIPTION,
-    CORS_ORIGINS, HOST, PORT, LOG_LEVEL
+    CORS_ORIGINS, HOST, PORT, LOG_LEVEL, ASTERISK_QUEUE_CONFIG
 )
 # Initialize database
 from shared.database import init_database
@@ -24,7 +24,7 @@ from shared.auth.routes import router as auth_router
 from apps.provisioning.routes import router as provisioning_router
 from apps.provisioning.routes import prov_router
 from apps.inbound_call_routing import router as inbound_call_routing_router
-
+from apps.call_centre.queues.routes import router as queues_router
 # Setup logging
 logging.basicConfig(level=getattr(logging, LOG_LEVEL.upper()))
 logger = logging.getLogger(__name__)
@@ -69,6 +69,7 @@ try:
     app.include_router(provisioning_router)
     app.include_router(prov_router)
     app.include_router(inbound_call_routing_router)
+    app.include_router(queues_router)
     
     logger.info("✅ Endpoints app loaded")
     logger.info("✅ Auth app loaded")
