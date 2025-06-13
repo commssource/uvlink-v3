@@ -4,6 +4,7 @@ from .schemas import QueueConfig, QueueMember, QueueListResponse
 from .services import QueueService
 from config import ASTERISK_QUEUE_CONFIG
 from shared.auth.endpoint_auth import EndpointAuth
+import os
 
 router = APIRouter(
     prefix="/api/v1/queues",
@@ -12,10 +13,13 @@ router = APIRouter(
 
 endpoint_auth = EndpointAuth()
 
-def get_queue_service():
-    return QueueService(ASTERISK_QUEUE_CONFIG)
+# Get the base path for queue configurations
+QUEUE_BASE_PATH = os.path.join("local_test", "queues.conf")
 
-@router.post("/", response_model=bool)
+def get_queue_service():
+    return QueueService(QUEUE_BASE_PATH)
+
+@router.post("/", response_model=QueueConfig)
 async def create_queue(
     queue: QueueConfig, 
     service: QueueService = Depends(get_queue_service),
@@ -24,8 +28,8 @@ async def create_queue(
     """Create a new queue configuration"""
     success = service.create_queue(queue)
     if not success:
-        raise HTTPException(status_code=500, detail="Failed to create queue")
-    return success
+        raise HTTPException(status_code=400, detail=f"Queue with name {queue.name} already exists")
+    return queue
 
 @router.get("/{queue_name}", response_model=QueueConfig)
 async def get_queue(

@@ -4,12 +4,18 @@ from .schemas import QueueConfig, QueueMember, QueueListResponse
 
 class QueueService:
     def __init__(self, queue_path: str):
-        self.queue_path = queue_path
+        # Ensure queue_path is a file path, not a directory
+        if os.path.isdir(queue_path):
+            self.queue_path = os.path.join(queue_path, "queues.conf")
+        else:
+            self.queue_path = queue_path
+            
         # Ensure the directory exists
-        os.makedirs(os.path.dirname(queue_path), exist_ok=True)
+        os.makedirs(os.path.dirname(self.queue_path), exist_ok=True)
+        
         # Create the file if it doesn't exist
-        if not os.path.exists(queue_path):
-            with open(queue_path, 'w') as f:
+        if not os.path.exists(self.queue_path):
+            with open(self.queue_path, 'w') as f:
                 f.write("")
 
     def _format_member_line(self, member: QueueMember) -> str:
