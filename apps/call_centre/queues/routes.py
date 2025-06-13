@@ -5,6 +5,8 @@ from .services import QueueService
 from config import ASTERISK_QUEUE_CONFIG
 from shared.auth.endpoint_auth import EndpointAuth
 import os
+from sqlalchemy.orm import Session
+from shared.database import get_db
 
 router = APIRouter(
     prefix="/api/v1/queues",
@@ -18,14 +20,18 @@ def get_queue_service():
 
 @router.post("/", response_model=QueueConfig)
 async def create_queue(
-    queue: QueueConfig, 
-    service: QueueService = Depends(get_queue_service),
+    queue: QueueConfig,
+    db: Session = Depends(get_db),
     auth: Dict[str, Any] = Depends(endpoint_auth)
 ):
-    """Create a new queue configuration"""
+    """Create a new queue"""
+    service = QueueService(ASTERISK_QUEUE_CONFIG)
     success = service.create_queue(queue)
     if not success:
-        raise HTTPException(status_code=400, detail=f"Queue with name {queue.name} already exists")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Queue with name {queue.name} already exists"
+        )
     return queue
 
 @router.get("/{queue_name}", response_model=QueueConfig)

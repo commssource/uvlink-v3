@@ -1,15 +1,12 @@
 import os
 from typing import List, Optional, Dict
 from .schemas import QueueConfig, QueueMember, QueueListResponse
+from config import ASTERISK_QUEUE_CONFIG_PATH, ASTERISK_QUEUE_CONFIG
 
 class QueueService:
-    def __init__(self, queue_path: str):
-        # Ensure queue_path is a file path, not a directory
-        if os.path.isdir(queue_path):
-            self.queue_path = os.path.join(queue_path, "queues.conf")
-        else:
-            self.queue_path = queue_path
-            
+    def __init__(self, queue_path: str = ASTERISK_QUEUE_CONFIG):
+        self.queue_path = queue_path
+        
         # Ensure the directory exists
         os.makedirs(os.path.dirname(self.queue_path), exist_ok=True)
         
