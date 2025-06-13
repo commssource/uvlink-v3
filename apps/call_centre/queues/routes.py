@@ -13,11 +13,8 @@ router = APIRouter(
 
 endpoint_auth = EndpointAuth()
 
-# Get the base path for queue configurations
-QUEUE_BASE_PATH = os.path.join("local_test", "queues.conf")
-
 def get_queue_service():
-    return QueueService(QUEUE_BASE_PATH)
+    return QueueService(ASTERISK_QUEUE_CONFIG)
 
 @router.post("/", response_model=QueueConfig)
 async def create_queue(
