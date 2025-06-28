@@ -1,0 +1,14 @@
+[{{ auth_id | default(endpoint_id + '-auth') }}]({{ auth_template | default('auth-basic-tpl') }})
+type=auth
+auth_type={{ auth_type | default('userpass') }}
+{% if username -%}
+username={{ username }}
+{% else -%}
+username={{ endpoint_id }}
+{% endif -%}
+{% if password -%}
+password={{ password }}
+{% endif -%}
+{% if realm -%}
+realm={{ realm }}
+{% endif -%}

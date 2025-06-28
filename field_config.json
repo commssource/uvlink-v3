@@ -1,0 +1,111 @@
+{
+  "endpoint_fields": {
+    "endpoint_fields": {
+      "direct_media": {
+        "default": "no",
+        "required": false,
+        "description": "Direct media"
+      },
+      "context": {
+        "default": "internal",
+        "required": true,
+        "description": "Dialplan context"
+      },
+      "language": {
+        "default": "uk",
+        "required": false,
+        "description": "Allowed Language"
+      },
+      "moh_suggest": {
+        "default": "default",
+        "required": false,
+        "description": "default MOH"
+      },
+      "force_rport": {
+        "default": "yes",
+        "required": true,
+        "description": "Enable NAT"
+      },
+      "rtp_symmetric": {
+        "default": "yes",
+        "required": false,
+        "description": "RTP Symmetric"
+      },
+      "rewrite_contact": {
+        "default": "yes",
+        "required": false,
+        "description": "Rewrite Contact"
+      },
+      "timers": {
+        "default": "no",
+        "required": false,
+        "description": "Enable timers"
+      },
+      "rtp_timeout": {
+        "default": "60",
+        "required": false,
+        "description": "RTP Timeout"
+      },
+      "send_pai": {
+        "default": "yes",
+        "required": false,
+        "description": "Send PAI"
+      },
+      "dtmf_mode": {
+        "default": "auto",
+        "required": false,
+        "description": "DTMF mode"
+      },
+      "inband_progress": {
+        "default": "no",
+        "required": false,
+        "description": "Inband Progress"
+      },
+      "tos_audio": {
+        "default": "ef",
+        "required": false,
+        "description": "TOS Audio"
+      },
+      "tos_video": {
+        "default": "af41",
+        "required": false,
+        "description": "TOS Video"
+      },
+      "t38_udptl": {
+        "default": "yes",
+        "required": false,
+        "description": "T38 UDP TL"
+      },
+      "disallow": {
+        "default": "all",
+        "required": true,
+        "description": "Disallowed codecs - payload only"
+      },
+      "suppress_q850_reason_headers": {
+        "default": "yes",
+        "required": false,
+        "description": "Suppress Q.850 reason headers"
+      },
+      "media_encryption": {
+        "default": "sdes",
+        "required": false,
+        "description": "Media Encryption"
+      },
+      "media_encryption_optimistic": {
+        "default": "yes",
+        "required": false,
+        "description": "Media Encryption Optimistic"
+      },
+      "media_address": {
+        "default": "10.200.200.10",
+        "required": false,
+        "description": "Media Address"
+      },
+      "bind_rtp_to_media_address": {
+        "default": "yes",
+        "required": false,
+        "description": "Bind RTP to Media Address"
+      }
+    }
+  }
+}

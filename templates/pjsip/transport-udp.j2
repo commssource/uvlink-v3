@@ -1,0 +1,7 @@
+[{{ transport_id | default('transport-udp') }}]({{ transport_template | default('transport-udp-tpl') }})
+type=transport
+protocol=udp
+{% if bind %}bind={{ bind }}{% else %}bind=0.0.0.0:5060{% endif %}
+{% if external_media_address %}external_media_address={{ external_media_address }}{% endif %}
+{% if external_signaling_address %}external_signaling_address={{ external_signaling_address }}{% endif %}
+{% if local_net %}local_net={{ local_net }}{% endif %}

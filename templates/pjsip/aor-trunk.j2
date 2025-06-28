@@ -1,0 +1,13 @@
+[{{ aor_id | default(endpoint_id) }}]({{ aor_template | default('aor-trunk-tpl') }})
+type=aor
+{% if contact -%}
+contact={{ contact }}
+{% endif -%}
+max_contacts=1
+qualify_timeout=10
+qualify_frequency=30
+authenticate_qualify=no
+default_expiration=3600
+minimum_expiration=60
+maximum_expiration=7200
+remove_existing=yes

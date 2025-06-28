@@ -1,0 +1,7 @@
+[{{ transport_id | default('transport-wss') }}]({{ transport_template | default('transport-wss-tpl') }})
+type=transport
+protocol=wss
+{% if bind %}bind={{ bind }}{% else %}bind=0.0.0.0:8089{% endif %}
+{% if cert_file %}cert_file={{ cert_file }}{% endif %}
+{% if priv_key_file %}priv_key_file={{ priv_key_file }}{% endif %}
+{% if ca_list_file %}ca_list_file={{ ca_list_file }}{% endif %}

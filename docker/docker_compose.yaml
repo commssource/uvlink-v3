@@ -1,0 +1,56 @@
+# =============================================================================
+# DOCKER COMPOSE SETUP
+# =============================================================================
+
+docker_compose: |
+  version: '3.8'
+  
+  services:
+    pjsip-template-manager:
+      build: .
+      ports:
+        - "8000:8000"
+      volumes:
+        - ./asterisk/etc:/etc/asterisk
+        - ./templates:/app/templates
+        - ./logs:/app/logs
+      environment:
+        - PJSIP_DEBUG=true
+        - PJSIP_PJSIP_CONF_PATH=/etc/asterisk/pjsip.conf
+        - PJSIP_PJSIP_TEMPLATES_DIR=/etc/asterisk/pjsip.d/templates
+        - PJSIP_PJSIP_INCLUDES_DIR=/etc/asterisk/pjsip.d/includes
+        - PJSIP_PJSIP_BACKUP_DIR=/etc/asterisk/backups
+      depends_on:
+        - redis
+        - postgres
+    
+    redis:
+      image: redis:alpine
+      ports:
+        - "6379:6379"
+    
+    postgres:
+      image: postgres:13
+      environment:
+        - POSTGRES_DB=pjsip_manager
+        - POSTGRES_USER=pjsip
+        - POSTGRES_PASSWORD=pjsip123
+      ports:
+        - "5432:5432"
+      volumes:
+        - postgres_data:/var/lib/postgresql/data
+    
+    asterisk:
+      image: asterisk:latest
+      volumes:
+        - ./asterisk/etc:/etc/asterisk
+        - ./asterisk/var:/var/lib/asterisk
+      ports:
+        - "5060:5060/udp"
+        - "5061:5061/tcp"
+        - "10000-10100:10000-10100/udp"
+      depends_on:
+        - pjsip-template-manager
+  
+  volumes:
+    postgres_data:

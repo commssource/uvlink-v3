@@ -1,0 +1,28 @@
+[{{ endpoint_id }}]({{ template_name | default('endpoint-webrtc-tpl') }})
+type=endpoint
+{% if context %}context={{ context }}{% endif %}
+{% if auth_id %}auth={{ auth_id }}{% endif %}
+{% if aor_id %}aors={{ aor_id }}{% endif %}
+transport=transport-wss
+{% if callerid %}callerid={{ callerid }}{% endif %}
+allow=opus,ulaw,alaw
+disallow=all
+dtmf_mode=rfc4733
+webrtc=yes
+media_encryption=dtls
+dtls_auto_generate_cert=yes
+ice_support=yes
+use_avpf=yes
+media_use_received_transport=yes
+rtcp_mux=yes
+direct_media=no
+force_rport=yes
+rewrite_contact=yes
+{% if device_state_busy_at %}device_state_busy_at={{ device_state_busy_at }}{% else %}device_state_busy_at=1{% endif %}
+{% if mailboxes %}mailboxes={{ mailboxes }}{% endif %}
+send_pai=yes
+send_rpid=yes
+allow_subscribe=yes
+rtp_timeout=30
+rtp_timeout_hold=60
+{% if set_var %}set_var={{ set_var }}{% endif %}

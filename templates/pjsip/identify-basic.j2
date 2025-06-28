@@ -1,0 +1,9 @@
+[{{ identify_id }}]({{ identify_template | default('identify-basic-tpl') }})
+type=identify
+endpoint={{ endpoint }}
+{% if match -%}
+match={{ match }}
+{% endif -%}
+{% if srv_lookups -%}
+srv_lookups={{ srv_lookups }}
+{% endif -%}

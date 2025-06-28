@@ -1,0 +1,18 @@
+[{{ endpoint_id }}]({{ template_name | default('endpoint-trunk-tpl') }})
+type=endpoint
+context={{ context | default('from-trunk') }}
+aors={{ aor_id }}
+accountcode={{ accountcode | default(endpoint_id) }}
+moh_suggest={{ moh_suggest | default('default') }}
+notify_early_inuse_ringing={{ notify_early_inuse_ringing | default('yes') }}
+refer_blind_progress={{ refer_blind_progress | default('yes') }}
+outbound_auth={{ auth_id }}
+direct_media={{ direct_media | default('no') }}
+rpid_connectedline={{ rpid_connectedline | default('no') }}
+dtmf_mode={{ dtmf_mode | default('rfc4733') }}
+allow={{ allow | default('alaw') }}
+use_ptime={{ use_ptime | default('yes') }}
+identify_by={{ identify_by | default('ip') }}
+deny={{ deny | default('0.0.0.0/0.0.0.0') }}
+permit={{permit}}
+subscribe_context=

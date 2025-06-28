@@ -1,0 +1,102 @@
+[{{ endpoint_id }}]({{ template_name | default('endpoint-basic-tpl') }})
+type=endpoint
+{% if context -%}
+context={{ context }}
+{% endif -%}
+{% if auth_id -%}
+auth={{ auth_id }}
+{% endif -%}
+{% if aor_id -%}
+aors={{ aor_id }}
+{% endif -%}
+{% if transport -%}
+transport={{ transport }}
+{% endif -%}
+{% if callerid -%}
+callerid={{ callerid }}
+{% endif -%}
+{% if accountcode -%}
+accountcode={{ accountcode }}
+{% endif -%}
+{% if allow -%}
+allow={{ allow }}
+{% else -%}
+allow=ulaw,alaw
+{% endif -%}
+{% if disallow -%}
+disallow={{ disallow }}
+{% else -%}
+disallow=all
+{% endif -%}
+{% if dtmf_mode -%}
+dtmf_mode={{ dtmf_mode }}
+{% else -%}
+dtmf_mode=rfc4733
+{% endif -%}
+{% if direct_media is defined -%}
+direct_media={{ direct_media | lower }}
+{% else -%}
+direct_media=no
+{% endif -%}
+{% if rtp_symmetric -%}
+rtp_symmetric={{ rtp_symmetric }}
+{% else -%}
+rtp_symmetric=yes
+{% endif -%}
+{% if force_rport -%}
+force_rport={{ force_rport }}
+{% else -%}
+force_rport=yes
+{% endif -%}
+{% if rewrite_contact -%}
+rewrite_contact={{ rewrite_contact }}
+{% else -%}
+rewrite_contact=yes
+{% endif -%}
+{% if ice_support -%}
+ice_support={{ ice_support }}
+{% else -%}
+ice_support=no
+{% endif -%}
+{% if device_state_busy_at -%}
+device_state_busy_at={{ device_state_busy_at }}
+{% else -%}
+device_state_busy_at=1
+{% endif -%}
+{% if voicemail == "yes" -%}
+mailboxes={{ endpoint_id }}@default
+{% endif -%}
+{% if send_pai -%}
+send_pai={{ send_pai }}
+{% else -%}
+send_pai=yes
+{% endif -%}
+{% if send_rpid -%}
+send_rpid={{ send_rpid }}
+{% else -%}
+send_rpid=yes
+{% endif -%}
+{% if allow_subscribe -%}
+allow_subscribe={{ allow_subscribe }}
+{% else -%}
+allow_subscribe=yes
+{% endif -%}
+{% if rtp_timeout -%}
+rtp_timeout={{ rtp_timeout }}
+{% else -%}
+rtp_timeout=30
+{% endif -%}
+{% if rtp_timeout_hold -%}
+rtp_timeout_hold={{ rtp_timeout_hold }}
+{% else -%}
+rtp_timeout_hold=60
+{% endif -%}
+{% if set_var -%}
+set_var={{ set_var }}
+{% endif -%}
+{% if webrtc -%}
+webrtc={{ webrtc }}
+{% endif -%}
+{% if media_encryption -%}
+media_encryption={{ media_encryption }}
+{% endif -%}

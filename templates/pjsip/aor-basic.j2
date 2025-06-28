@@ -1,0 +1,42 @@
+[{{ aor_id | default(endpoint_id) }}]({{ aor_template | default('aor-basic-tpl') }})
+type=aor
+{% if max_contacts -%}
+max_contacts={{ max_contacts }}
+{% else -%}
+max_contacts=1
+{% endif -%}
+{% if qualify_timeout -%}
+qualify_timeout={{ qualify_timeout }}
+{% else -%}
+qualify_timeout=3
+{% endif -%}
+{% if qualify_frequency -%}
+qualify_frequency={{ qualify_frequency }}
+{% else -%}
+qualify_frequency=60
+{% endif -%}
+{% if authenticate_qualify -%}
+authenticate_qualify={{ authenticate_qualify }}
+{% else -%}
+authenticate_qualify=no
+{% endif -%}
+{% if default_expiration -%}
+default_expiration={{ default_expiration }}
+{% else -%}
+default_expiration=3600
+{% endif -%}
+{% if minimum_expiration -%}
+minimum_expiration={{ minimum_expiration }}
+{% else -%}
+minimum_expiration=60
+{% endif -%}
+{% if maximum_expiration -%}
+maximum_expiration={{ maximum_expiration }}
+{% else -%}
+maximum_expiration=7200
+{% endif -%}
+{% if remove_existing -%}
+remove_existing={{ remove_existing }}
+{% else -%}
+remove_existing=yes
+{% endif -%}

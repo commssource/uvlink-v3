@@ -1,0 +1,29 @@
+[{{ registration_id }}]({{ registration_template | default('registration-basic-tpl') }})
+type=registration
+{% if transport -%}
+transport={{ transport }}
+{% endif -%}
+{% if outbound_auth -%}
+outbound_auth={{ auth_id }}
+{% endif -%}
+{% if server_uri -%}
+server_uri={{ server_uri }}
+{% endif -%}
+{% if client_uri -%}
+client_uri={{ client_uri }}
+{% endif -%}
+{% if contact_user -%}
+contact_user={{ contact_user }}
+{% endif -%}
+{% if retry_interval -%}
+retry_interval={{ retry_interval }}
+{% endif -%}
+{% if max_retries -%}
+max_retries={{ max_retries }}
+{% endif -%}
+{% if forbidden_retry_interval -%}
+forbidden_retry_interval={{ forbidden_retry_interval }}
+{% endif -%}
+{% if expiration -%}
+expiration={{ expiration }}
+{% endif -%}

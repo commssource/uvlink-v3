@@ -1,0 +1,5 @@
+[{{ contact_id | default(endpoint_id + '-contact') }}]({{ contact_template | default('contact-basic-tpl') }})
+type=contact
+{% if uri %}uri={{ uri }}{% endif %}
+{% if expiration_time %}expiration_time={{ expiration_time }}{% else %}expiration_time=3600{% endif %}
+{% if qualify_frequency %}qualify_frequency={{ qualify_frequency }}{% else %}qualify_frequency=60{% endif %}
