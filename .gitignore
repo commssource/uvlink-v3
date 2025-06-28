@@ -1,0 +1,15 @@
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.development
+.env.test
+.env.production
+local_test/
+__pycache__/
+logs/
+venv/
+app.db
+pjsip_api.log
+setup_templates.py
