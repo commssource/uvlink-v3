@@ -1,0 +1,119 @@
+[{{ queue_name }}]
+; Advanced queue configuration with all options
+strategy={{ strategy | default('ringall') }}
+musiconhold={{ musiconhold | default('default') }}
+timeout={{ timeout | default(15) }}
+retry={{ retry | default(5) }}
+maxlen={{ maxlen | default(0) }}
+joinempty={{ joinempty | default('yes') }}
+leavewhenempty={{ leavewhenempty | default('no') }}
+ringinuse={{ ringinuse | default('no') }}
+
+; Announcements
+announce-frequency={{ announce_frequency | default(0) }}
+announce-holdtime={{ announce_holdtime | default('no') }}
+announce-position={{ announce_position | default('yes') }}
+periodic-announce-frequency={{ periodic_announce_frequency | default(0) }}
+{% if announce -%}
+announce={{ announce }}
+{% endif -%}
+{% if periodic_announce -%}
+periodic-announce={{ periodic_announce }}
+{% endif -%}
+{% if context -%}
+context={{ context }}
+{% endif -%}
+
+; Custom announcement sounds
+{% if queue_youarenext -%}
+queue-youarenext={{ queue_youarenext }}
+{% endif -%}
+{% if queue_thereare -%}
+queue-thereare={{ queue_thereare }}
+{% endif -%}
+{% if queue_callswaiting -%}
+queue-callswaiting={{ queue_callswaiting }}
+{% endif -%}
+{% if queue_holdtime -%}
+queue-holdtime={{ queue_holdtime }}
+{% endif -%}
+{% if queue_minutes -%}
+queue-minutes={{ queue_minutes }}
+{% endif -%}
+{% if queue_seconds -%}
+queue-seconds={{ queue_seconds }}
+{% endif -%}
+{% if queue_thankyou -%}
+queue-thankyou={{ queue_thankyou }}
+{% endif -%}
+{% if queue_reporthold -%}
+queue-reporthold={{ queue_reporthold }}
+{% endif -%}
+
+; Agent behavior
+wrapuptime={{ wrapuptime | default(0) }}
+autopause={{ autopause | default('no') }}
+autopausedelay={{ autopausedelay | default(0) }}
+autofill={{ autofill | default('yes') }}
+{% if maxwait -%}
+maxwait={{ maxwait }}
+{% endif -%}
+{% if reportholdtime -%}
+reportholdtime={{ reportholdtime }}
+{% endif -%}
+{% if memberdelay -%}
+memberdelay={{ memberdelay }}
+{% endif -%}
+{% if timeoutrestart -%}
+timeoutrestart={{ timeoutrestart }}
+{% endif -%}
+
+; Recording and monitoring
+{% if monitor_type -%}
+monitor-type={{ monitor_type }}
+{% endif -%}
+{% if monitor_format -%}
+monitor-format={{ monitor_format }}
+{% endif -%}
+{% if monitor_join -%}
+monitor-join={{ monitor_join }}
+{% endif -%}
+
+; Service level and statistics
+servicelevel={{ servicelevel | default(60) }}
+weight={{ weight | default(0) }}
+{% if eventmemberstatus -%}
+eventmemberstatus={{ eventmemberstatus }}
+{% endif -%}
+{% if eventwhencalled -%}
+eventwhencalled={{ eventwhencalled }}
+{% endif -%}
+
+; Call distribution
+{% if penaltymemberslimit -%}
+penaltymemberslimit={{ penaltymemberslimit }}
+{% endif -%}
+{% if relative_periodic_announce -%}
+relative-periodic-announce={{ relative_periodic_announce }}
+{% endif -%}
+{% if random_periodic_announce -%}
+random-periodic-announce={{ random_periodic_announce }}
+{% endif -%}
+
+; Queue behavior
+{% if min_announce_frequency -%}
+min-announce-frequency={{ min_announce_frequency }}
+{% endif -%}
+{% if announce_to_first_user -%}
+announce-to-first-user={{ announce_to_first_user }}
+{% endif -%}
+{% if announce_round_seconds -%}
+announce-round-seconds={{ announce_round_seconds }}
+{% endif -%}
+
+{% if members -%}
+; Queue Members
+{% for member in members -%}
+member => {{ member }}
+{% endfor -%}
+{% endif -%}

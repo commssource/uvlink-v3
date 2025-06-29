@@ -1,0 +1,176 @@
+; ============================================================================
+; queue-support.j2 - Support/Help Desk Queue Template
+; ============================================================================
+[{{ queue_name }}]
+; Support queue with priority handling and announcements
+strategy={{ strategy | default('leastrecent') }}
+musiconhold={{ musiconhold | default('default') }}
+timeout={{ timeout | default(20) }}
+retry={{ retry | default(3) }}
+maxlen={{ maxlen | default(50) }}
+
+; Enhanced announcements for support
+announce-frequency={{ announce_frequency | default(30) }}
+announce-holdtime={{ announce_holdtime | default('yes') }}
+announce-position={{ announce_position | default('yes') }}
+periodic-announce-frequency={{ periodic_announce_frequency | default(60) }}
+{% if announce -%}
+announce={{ announce }}
+{% else -%}
+announce=queue-support-intro
+{% endif -%}
+{% if periodic_announce -%}
+periodic-announce={{ periodic_announce }}
+{% else -%}
+periodic-announce=queue-support-periodic
+{% endif -%}
+
+; Support-specific behavior
+joinempty={{ joinempty | default('no') }}
+leavewhenempty={{ leavewhenempty | default('yes') }}
+ringinuse={{ ringinuse | default('no') }}
+wrapuptime={{ wrapuptime | default(30) }}
+autopause={{ autopause | default('yes') }}
+autopausedelay={{ autopausedelay | default(10) }}
+servicelevel={{ servicelevel | default(120) }}
+weight={{ weight | default(10) }}
+
+; Recording for quality assurance
+monitor-type={{ monitor_type | default('MixMonitor') }}
+monitor-format={{ monitor_format | default('wav') }}
+monitor-join={{ monitor_join | default('yes') }}
+
+{% if members -%}
+; Support Team Members
+{% for member in members -%}
+member => {{ member }}
+{% endfor -%}
+{% endif -%}
+
+; ============================================================================
+; queue-sales.j2 - Sales Queue Template
+; ============================================================================
+[{{ queue_name }}]
+; Sales queue optimized for conversion
+strategy={{ strategy | default('fewestcalls') }}
+musiconhold={{ musiconhold | default('sales-music') }}
+timeout={{ timeout | default(25) }}
+retry={{ retry | default(2) }}
+maxlen={{ maxlen | default(25) }}
+
+; Minimal announcements to avoid deterring customers
+announce-frequency={{ announce_frequency | default(60) }}
+announce-holdtime={{ announce_holdtime | default('no') }}
+announce-position={{ announce_position | default('no') }}
+periodic-announce-frequency={{ periodic_announce_frequency | default(120) }}
+{% if announce -%}
+announce={{ announce }}
+{% else -%}
+announce=queue-sales-welcome
+{% endif -%}
+
+; Sales-specific behavior - keep customers connected
+joinempty={{ joinempty | default('yes') }}
+leavewhenempty={{ leavewhenempty | default('no') }}
+ringinuse={{ ringinuse | default('yes') }}
+wrapuptime={{ wrapuptime | default(60) }}
+autopause={{ autopause | default('no') }}
+servicelevel={{ servicelevel | default(60) }}
+weight={{ weight | default(20) }}
+
+; High-priority queue
+maxwait={{ maxwait | default(300) }}
+
+{% if members -%}
+; Sales Team Members
+{% for member in members -%}
+member => {{ member }}
+{% endfor -%}
+{% endif -%}
+
+; ============================================================================
+; queue-priority.j2 - Priority/VIP Queue Template
+; ============================================================================
+[{{ queue_name }}]
+; VIP/Priority customer queue
+strategy={{ strategy | default('ringall') }}
+musiconhold={{ musiconhold | default('vip-music') }}
+timeout={{ timeout | default(10) }}
+retry={{ retry | default(1) }}
+maxlen={{ maxlen | default(10) }}
+
+; Immediate attention announcements
+announce-frequency={{ announce_frequency | default(15) }}
+announce-holdtime={{ announce_holdtime | default('yes') }}
+announce-position={{ announce_position | default('yes') }}
+periodic-announce-frequency={{ periodic_announce_frequency | default(30) }}
+{% if announce -%}
+announce={{ announce }}
+{% else -%}
+announce=queue-vip-welcome
+{% endif -%}
+
+; Priority behavior
+joinempty={{ joinempty | default('no') }}
+leavewhenempty={{ leavewhenempty | default('strict') }}
+ringinuse={{ ringinuse | default('no') }}
+wrapuptime={{ wrapuptime | default(15) }}
+autopause={{ autopause | default('yes') }}
+servicelevel={{ servicelevel | default(30) }}
+weight={{ weight | default(100) }}
+
+; Escalation settings
+maxwait={{ maxwait | default(120) }}
+
+{% if members -%}
+; Priority Team Members (senior staff)
+{% for member in members -%}
+member => {{ member }}
+{% endfor -%}
+{% endif -%}
+
+; ============================================================================
+; queue-overflow.j2 - Overflow Queue Template
+; ============================================================================
+[{{ queue_name }}]
+; Overflow queue for busy periods
+strategy={{ strategy | default('rrmemory') }}
+musiconhold={{ musiconhold | default('default') }}
+timeout={{ timeout | default(30) }}
+retry={{ retry | default(5) }}
+maxlen={{ maxlen | default(100) }}
+
+; Extended hold management
+announce-frequency={{ announce_frequency | default(45) }}
+announce-holdtime={{ announce_holdtime | default('yes') }}
+announce-position={{ announce_position | default('yes') }}
+periodic-announce-frequency={{ periodic_announce_frequency | default(90) }}
+{% if announce -%}
+announce={{ announce }}
+{% else -%}
+announce=queue-overflow-intro
+{% endif -%}
+{% if periodic_announce -%}
+periodic-announce={{ periodic_announce }}
+{% else -%}
+periodic-announce=queue-overflow-wait
+{% endif -%}
+
+; Overflow behavior - accept all calls
+joinempty={{ joinempty | default('yes') }}
+leavewhenempty={{ leavewhenempty | default('no') }}
+ringinuse={{ ringinuse | default('yes') }}
+wrapuptime={{ wrapuptime | default(10) }}
+autopause={{ autopause | default('no') }}
+servicelevel={{ servicelevel | default(180) }}
+weight={{ weight | default(1) }}
+
+; Extended wait tolerance
+maxwait={{ maxwait | default(600) }}
+
+{% if members -%}
+; Overflow Team Members
+{% for member in members -%}
+member => {{ member }}
+{% endfor -%}
+{% endif -%}

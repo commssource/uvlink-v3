@@ -1,0 +1,213 @@
+# ============================================================================
+# Queue Management Scripts
+# ============================================================================
+
+queue_management_script = '''
+#!/bin/bash
+# queue-manager.sh - Queue management helper script
+
+# Add agent to queue
+add_agent() {
+    local queue=$1
+    local agent=$2
+    local penalty=${3:-0}
+    
+    curl -X POST "http://localhost:8000/api/v1/queues/$queue/members" \
+         -G -d "member=$agent" -d "penalty=$penalty"
+}
+
+# Remove agent from queue  
+remove_agent() {
+    local queue=$1
+    local agent=$2
+    
+    curl -X DELETE "http://localhost:8000/api/v1/queues/$queue/members/$agent"
+}
+
+# Pause/unpause agent (via Asterisk CLI)
+pause_agent() {
+    local queue=$1
+    local agent=$2
+    local reason=${3:-"Break"}
+    
+    asterisk -rx "queue pause member $agent queue $queue reason $reason"
+}
+
+unpause_agent() {
+    local queue=$1  
+    local agent=$2
+    
+    asterisk -rx "queue unpause member $agent queue $queue"
+}
+
+# Show queue status
+show_queue() {
+    local queue=${1:-"all"}
+    
+    if [ "$queue" = "all" ]; then
+        asterisk -rx "queue show"
+    else
+        asterisk -rx "queue show $queue"
+    fi
+}
+
+# Bulk agent management
+bulk_add_agents() {
+    local queue=$1
+    shift
+    local agents=("$@")
+    
+    for agent in "${agents[@]}"; do
+        echo "Adding $agent to $queue..."
+        add_agent "$queue" "$agent"
+    done
+}
+
+# Emergency queue activation
+activate_emergency() {
+    echo "🚨 Activating emergency queue..."
+    
+    # Add all available agents to emergency queue
+    bulk_add_agents "emergency" "PJSIP/1001" "PJSIP/1002" "PJSIP/1003"
+    
+    # Pause agents in other queues
+    for queue in support-general support-vip sales; do
+        for agent in PJSIP/1004 PJSIP/1005 PJSIP/1006; do
+            pause_agent "$queue" "$agent" "Emergency"
+        done
+    done
+    
+    echo "✅ Emergency queue activated"
+}
+
+deactivate_emergency() {
+    echo "🔄 Deactivating emergency queue..."
+    
+    # Remove agents from emergency queue
+    for agent in PJSIP/1001 PJSIP/1002 PJSIP/1003; do
+        remove_agent "emergency" "$agent"
+    done
+    
+    # Unpause agents in other queues
+    for queue in support-general support-vip sales; do
+        for agent in PJSIP/1004 PJSIP/1005 PJSIP/1006; do
+            unpause_agent "$queue" "$agent"
+        done
+    done
+    
+    echo "✅ Emergency queue deactivated"
+}
+
+# Usage examples
+case "$1" in
+    add)
+        add_agent "$2" "$3" "$4"
+        ;;
+    remove)
+        remove_agent "$2" "$3"
+        ;;
+    pause)
+        pause_agent "$2" "$3" "$4"
+        ;;
+    unpause)
+        unpause_agent "$2" "$3"
+        ;;
+    show)
+        show_queue "$2"
+        ;;
+    emergency)
+        activate_emergency
+        ;;
+    normal)
+        deactivate_emergency
+        ;;
+    *)
+        echo "Usage: $0 {add|remove|pause|unpause|show|emergency|normal}"
+        echo "Examples:"
+        echo "  $0 add support-general PJSIP/1001 5"
+        echo "  $0 remove support-general PJSIP/1001"
+        echo "  $0 pause support-general PJSIP/1001 'Lunch break'"
+        echo "  $0 show support-general"
+        echo "  $0 emergency"
+        ;;
+esac
+'''
+
+# ============================================================================
+# Monitoring and Statistics
+# ============================================================================
+
+queue_statistics_example = '''
+# Queue Statistics and Monitoring
+
+# 1. Real-time queue statistics via AMI
+import asyncio
+from asterisk.ami import AMIClient
+
+async def get_queue_stats(queue_name):
+    """Get real-time queue statistics"""
+    client = AMIClient(host='localhost', port=5038, username='admin', password='secret')
+    await client.login()
+    
+    # Get queue summary
+    response = await client.send_action({
+        'Action': 'QueueSummary',
+        'Queue': queue_name
+    })
+    
+    # Get queue status  
+    status = await client.send_action({
+        'Action': 'QueueStatus',
+        'Queue': queue_name
+    })
+    
+    await client.logoff()
+    return {
+        'summary': response,
+        'status': status
+    }
+
+# 2. Queue performance metrics
+def calculate_queue_metrics(queue_stats):
+    """Calculate key performance indicators"""
+    return {
+        'service_level': queue_stats.get('service_level_perf', 0),
+        'average_wait': queue_stats.get('avg_holdtime', 0),
+        'calls_completed': queue_stats.get('completed', 0),
+        'calls_abandoned': queue_stats.get('abandoned', 0),
+        'abandonment_rate': queue_stats.get('abandoned', 0) / max(queue_stats.get('total_calls', 1), 1) * 100,
+        'agent_utilization': queue_stats.get('agent_busy_time', 0) / queue_stats.get('agent_total_time', 1) * 100
+    }
+
+# 3. Dashboard data endpoint
+@app.get("/api/v1/queues/dashboard")
+async def queue_dashboard():
+    """Get dashboard data for all queues"""
+    queue_manager = get_queue_manager()
+    queue_names = await queue_manager.list_queue_configs()
+    
+    dashboard_data = {
+        'queues': [],
+        'summary': {
+            'total_queues': len(queue_names),
+            'total_calls_waiting': 0,
+            'total_agents_available': 0,
+            'overall_service_level': 0
+        }
+    }
+    
+    for queue_name in queue_names:
+        stats = await get_queue_stats(queue_name)
+        metrics = calculate_queue_metrics(stats)
+        
+        dashboard_data['queues'].append({
+            'name': queue_name,
+            'calls_waiting': stats.get('calls_waiting', 0),
+            'agents_available': stats.get('agents_available', 0),
+            'longest_wait': stats.get('longest_wait', 0),
+            'service_level': metrics['service_level'],
+            'abandonment_rate': metrics['abandonment_rate']
+        })
+    
+    return dashboard_data
+'''

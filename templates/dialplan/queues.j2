@@ -1,0 +1,86 @@
+dialplan_example = '''
+; extensions.conf - Queue integration examples
+
+[from-internal]
+; Main support number with priority routing
+exten => 100,1,NoOp(Support Call)
+exten => 100,n,Set(CHANNEL(language)=en)
+exten => 100,n,Background(support-menu)
+exten => 100,n,WaitExten(10)
+
+; VIP support (option 1)
+exten => 1,1,NoOp(VIP Support)
+exten => 1,n,Set(QUEUE_PRIO=10)
+exten => 1,n,Queue(support-vip,tT,,,300)
+exten => 1,n,Goto(support-overflow,s,1)
+
+; General support (option 2 or timeout)
+exten => 2,1,NoOp(General Support)
+exten => 2,n,Set(QUEUE_PRIO=5) 
+exten => 2,n,Queue(support-general,tT,,,600)
+exten => 2,n,Goto(support-overflow,s,1)
+
+; Emergency (option 9)
+exten => 9,1,NoOp(Emergency)
+exten => 9,n,Set(QUEUE_PRIO=20)
+exten => 9,n,Queue(emergency,tT,,,60)
+exten => 9,n,Dial(PJSIP/emergency-phone)
+
+; Timeout/Invalid - go to general
+exten => t,1,Goto(2,1)
+exten => i,1,Goto(2,1)
+
+[support-overflow]
+; Overflow context for busy periods
+exten => s,1,NoOp(Support Overflow)
+exten => s,n,Playback(support-busy)
+exten => s,n,Queue(support-overflow,tT,,,1800)
+exten => s,n,Voicemail(support@default,u)
+exten => s,n,Hangup()
+
+[callback-queue] 
+; Callback context
+exten => s,1,NoOp(Callback Option)
+exten => s,n,Background(callback-menu)
+exten => s,n,WaitExten(10)
+exten => s,n,Hangup()
+
+exten => 1,1,NoOp(Request Callback)
+exten => 1,n,System(echo "${CALLERID(num)}" >> /tmp/callbacks.txt)
+exten => 1,n,Playback(callback-scheduled) 
+exten => 1,n,Hangup()
+
+exten => 2,1,NoOp(Continue Waiting)
+exten => 2,n,Return()
+
+[after-hours]
+; After hours handling
+exten => s,1,NoOp(After Hours)
+exten => s,n,GotoIfTime(09:00-17:00,mon-fri,*,*?business-hours,s,1)
+exten => s,n,Queue(support-afterhours,tT,,,300)
+exten => s,n,Voicemail(afterhours@default,u)
+exten => s,n,Hangup()
+
+[multilingual]
+; Language selection
+exten => s,1,NoOp(Language Selection)
+exten => s,n,Background(language-menu)
+exten => s,n,WaitExten(10)
+exten => s,n,Goto(english,s,1)
+
+exten => 1,1,Goto(english,s,1)
+exten => 2,1,Goto(spanish,s,1) 
+exten => 3,1,Goto(french,s,1)
+
+[english]
+exten => s,1,Set(CHANNEL(language)=en)
+exten => s,n,Queue(support-english,tT)
+
+[spanish] 
+exten => s,1,Set(CHANNEL(language)=es)
+exten => s,n,Queue(support-spanish,tT)
+
+[french]
+exten => s,1,Set(CHANNEL(language)=fr) 
+exten => s,n,Queue(support-french,tT)
+'''

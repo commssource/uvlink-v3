@@ -20,7 +20,7 @@ from ..schemas import (
     VoicemailConfig, AuthConfig, AORConfig, EndpointFilters, SortOptions, 
     EndpointTypeFilter, AuthTypeFilter
 )
-from .template_manager import TemplateManager
+from shared.template_manager import UnifiedTemplateManager
 
 
 class FieldConfigManager:
@@ -109,7 +109,7 @@ class FieldConfigManager:
 class SectionGenerator:
     """Handles generation of different configuration sections"""
     
-    def __init__(self, template_manager: TemplateManager, logger: logging.Logger):
+    def __init__(self, template_manager: UnifiedTemplateManager, logger: logging.Logger):
         self.template_manager = template_manager
         self.logger = logger
     
@@ -290,16 +290,26 @@ class ConfigFileManager:
 
 
 class ConfigManager:
-    """Optimized PJSIP configuration manager"""
+    """Updated PJSIP configuration manager using unified template manager"""
     
-    def __init__(self, settings: Settings, template_manager: TemplateManager):
+    def __init__(self, settings: Settings, template_manager: UnifiedTemplateManager = None):
         self.settings = settings
-        self.template_manager = template_manager
+        
+        # Use provided template manager or create new one with PJSIP focus
+        if template_manager is None:
+            template_dirs = [
+                Path(settings.template_dir) / "pjsip",
+                Path(settings.template_dir),
+            ]
+            self.template_manager = UnifiedTemplateManager(template_dirs)
+        else:
+            self.template_manager = template_manager
+            
         self.logger = logging.getLogger(f"{__name__}.ConfigManager")
         
-        # Initialize components
+        # Initialize other components (same as before)
         self.field_manager = FieldConfigManager()
-        self.section_generator = SectionGenerator(template_manager, self.logger)
+        self.section_generator = SectionGenerator(self.template_manager, self.logger)
         self.validator = ConfigValidator(self.logger)
         self.file_manager = ConfigFileManager(settings, self.logger)
 

@@ -10,12 +10,10 @@ It supports hierarchical templates, include directives, and automated configurat
 generation with validation and backup capabilities.
 """
 
-from .template_manager import TemplateManager
 from .config_manager import ConfigManager
 from .tasks import reload_asterisk_config, cleanup_old_backups_task
 
 __all__ = [
-    'TemplateManager',
     'ConfigManager', 
     'reload_asterisk_config',
     'cleanup_old_backups_task'

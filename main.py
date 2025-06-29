@@ -1,177 +1,115 @@
 # ============================================================================
-# main.py - FastAPI Application with PJSIP Configuration Management
+# main.py - Fixed Manager Initialization
 # ============================================================================
 
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import JSONResponse
-from contextlib import asynccontextmanager
+from fastapi import FastAPI
+from config import get_current_settings, print_configuration_summary
 import logging
-import sys
-from pathlib import Path
+import asyncio
 
-# Import your modules
-from config import Settings, get_settings
-from apps.endpoints.routes import (
-    router as pjsip_router, 
-    initialize_managers,
-    value_error_handler,
-    file_not_found_handler
-)
-
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout),
-        logging.FileHandler('pjsip_api.log')
-    ]
-)
-
+# Setup logging first
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-
-# Lifespan context manager for startup/shutdown
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Manage application lifespan events"""
-    # Startup
-    logger.info("Starting PJSIP Configuration API...")
+def create_app():
+    """Create FastAPI application"""
+    settings = get_current_settings()
     
+    app = FastAPI(
+        title=settings.app_name,
+        version=settings.app_version,
+        description="Asterisk Configuration Manager API",
+        debug=settings.debug,
+    )
+    
+    return app
+
+# Create app
+app = create_app()
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize everything on startup"""
     try:
-        # Initialize settings
-        settings = get_settings()
+        settings = get_current_settings()
+        logger.info("🚀 Starting Asterisk Configuration Manager...")
         
-        # Initialize PJSIP managers
-        await initialize_managers(settings)
+        print_configuration_summary(settings)
         
-        logger.info("PJSIP Configuration API started successfully")
+        # Import and initialize managers
+        from shared.template_manager import UnifiedTemplateManager
+        from apps.endpoints.pjsip_manager.config_manager import ConfigManager
+        from apps.queues.queue_manager import QueueConfigManager
+        
+        # Initialize template manager
+        template_dirs = settings.get_template_directories()
+        template_manager = UnifiedTemplateManager(template_dirs)
+        logger.info(f"✅ Template manager initialized with directories: {[str(d) for d in template_dirs]}")
+        
+        # Initialize PJSIP manager
+        pjsip_manager = ConfigManager(settings, template_manager)
+        logger.info("✅ PJSIP manager initialized")
+        
+        # Initialize Queue manager
+        queue_manager = QueueConfigManager(settings, template_manager)
+        logger.info("✅ Queue manager initialized")
+        
+        # Set managers in API modules (import the modules, not the routers)
+        import apps.endpoints.routes as pjsip_routes
+        pjsip_routes.set_managers(template_manager, pjsip_manager, settings)
+        
+        import apps.queues.routes as queue_routes
+        queue_routes.set_managers(template_manager, queue_manager, settings)
+        
+        logger.info("🎉 All managers initialized and set successfully!")
         
     except Exception as e:
-        logger.error(f"Failed to start application: {e}")
+        logger.error(f"❌ Failed to initialize application: {e}")
+        # Log the full traceback for debugging
+        import traceback
+        logger.error(traceback.format_exc())
         raise
-    
-    yield
-    
-    # Shutdown
-    logger.info("Shutting down PJSIP Configuration API...")
-
-
-# Create FastAPI application
-app = FastAPI(
-    title="PJSIP Configuration Management API",
-    description="""
-    A comprehensive REST API for managing Asterisk PJSIP configurations using Jinja2 templates.
-    
-    ## Features
-    
-    * **Endpoint Management**: Create, read, update, and delete PJSIP endpoints
-    * **Template System**: Manage Jinja2 templates for configuration generation
-    * **Advanced Filtering**: Filter and search endpoints with multiple criteria
-    * **Bulk Operations**: Create multiple endpoints at once
-    * **Configuration Validation**: Validate templates and generated configurations
-    * **Backup Management**: Create and manage configuration backups
-    * **Statistics**: Get insights into your PJSIP configuration
-    
-    ## Endpoint Types Supported
-    
-    * **Basic SIP Endpoints**: Standard SIP phones and devices
-    * **WebRTC Endpoints**: Browser-based WebRTC clients
-    * **SIP Trunks**: Provider connections and trunk lines
-    * **Conference Rooms**: Audio conferencing endpoints
-    * **Custom Types**: Create your own endpoint types with custom templates
-    
-    ## Authentication
-    
-    This API supports various authentication methods. Configure authentication
-    in your settings file.
-    """,
-    version="1.0.0",
-    contact={
-        "name": "PJSIP Configuration API",
-        "email": "admin@yourcompany.com",
-    },
-    license_info={
-        "name": "MIT License",
-        "url": "https://opensource.org/licenses/MIT",
-    },
-    lifespan=lifespan
-)
-
-# Add middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Configure this properly for production
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-app.add_middleware(GZipMiddleware, minimum_size=1000)
-
-# Include routers
-app.include_router(pjsip_router)
-
-# Register exception handlers
-app.add_exception_handler(ValueError, value_error_handler)
-app.add_exception_handler(FileNotFoundError, file_not_found_handler)
-
-
-# Root endpoint
-@app.get("/", tags=["Root"])
-async def root():
-    """Root endpoint with API information"""
-    return {
-        "message": "PJSIP Configuration Management API",
-        "version": "1.0.0",
-        "docs_url": "/docs",
-        "openapi_url": "/openapi.json",
-        "endpoints": {
-            "endpoints": "/api/v1/pjsip/endpoints",
-            "templates": "/api/v1/pjsip/templates",
-            "health": "/api/v1/pjsip/health",
-            "stats": "/api/v1/pjsip/stats"
-        }
-    }
-
-
-# Global exception handler
-@app.exception_handler(Exception)
-async def global_exception_handler(request, exc):
-    """Global exception handler for unhandled errors"""
-    logger.error(f"Unhandled exception: {exc}", exc_info=True)
-    return JSONResponse(
-        status_code=500,
-        content={
-            "detail": "Internal server error",
-            "type": "internal_error",
-            "timestamp": str(request.url),
-        }
-    )
-
 
 # Health check endpoint
-@app.get("/health", tags=["Health"])
+@app.get("/health")
 async def health_check():
-    """Simple health check endpoint"""
+    """Health check"""
     return {
         "status": "healthy",
-        "service": "PJSIP Configuration API",
-        "version": "1.0.0"
+        "message": "Asterisk Configuration Manager is running"
     }
 
+@app.get("/")
+async def root():
+    """Root endpoint"""
+    return {
+        "message": "Asterisk Configuration Manager API",
+        "docs": "/docs",
+        "health": "/health",
+        "endpoints": "/api/v1/pjsip/endpoints",
+        "queues": "/api/v1/queues"
+    }
+
+# Include routers - import the router objects
+from apps.endpoints.routes import router as pjsip_router
+from apps.queues.routes import router as queue_router
+
+app.include_router(pjsip_router)
+app.include_router(queue_router)
 
 if __name__ == "__main__":
     import uvicorn
     
-    # Development server
-    uvicorn.run(
-        "main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=True,
-        log_level="info"
-    )
+    settings = get_current_settings()
+    uvicorn_config = settings.get_uvicorn_config()
+    
+    logger.info(f"Starting server on {settings.host}:{settings.port}")
+    logger.info(f"Environment: {'Development' if settings.is_development() else 'Production'}")
+    logger.info(f"Debug mode: {settings.debug}")
+    logger.info("Access API docs at: http://localhost:8000/docs")
+    logger.info("Test endpoints:")
+    logger.info("  - GET  http://localhost:8000/health")
+    logger.info("  - GET  http://localhost:8000/api/v1/pjsip/endpoints")
+    logger.info("  - GET  http://localhost:8000/api/v1/queues")
+    
+    uvicorn.run("main:app", **uvicorn_config)

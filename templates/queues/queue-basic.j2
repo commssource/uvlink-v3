@@ -1,0 +1,78 @@
+[{{ queue_name }}]
+; Basic queue configuration
+strategy={{ strategy | default('ringall') }}
+musiconhold={{ musiconhold | default('default') }}
+timeout={{ timeout | default(15) }}
+retry={{ retry | default(5) }}
+maxlen={{ maxlen | default(0) }}
+announce-frequency={{ announce_frequency | default(0) }}
+announce-holdtime={{ announce_holdtime | default('no') }}
+announce-position={{ announce_position | default('yes') }}
+periodic-announce-frequency={{ periodic_announce_frequency | default(0) }}
+{% if context -%}
+context={{ context }}
+{% endif -%}
+{% if announce -%}
+announce={{ announce }}
+{% endif -%}
+{% if periodic_announce -%}
+periodic-announce={{ periodic_announce }}
+{% endif -%}
+{% if queue_youarenext -%}
+queue-youarenext={{ queue_youarenext }}
+{% endif -%}
+{% if queue_thereare -%}
+queue-thereare={{ queue_thereare }}
+{% endif -%}
+{% if queue_callswaiting -%}
+queue-callswaiting={{ queue_callswaiting }}
+{% endif -%}
+{% if queue_holdtime -%}
+queue-holdtime={{ queue_holdtime }}
+{% endif -%}
+{% if queue_minutes -%}
+queue-minutes={{ queue_minutes }}
+{% endif -%}
+{% if queue_seconds -%}
+queue-seconds={{ queue_seconds }}
+{% endif -%}
+{% if queue_thankyou -%}
+queue-thankyou={{ queue_thankyou }}
+{% endif -%}
+{% if queue_reporthold -%}
+queue-reporthold={{ queue_reporthold }}
+{% endif -%}
+joinempty={{ joinempty | default('yes') }}
+leavewhenempty={{ leavewhenempty | default('no') }}
+ringinuse={{ ringinuse | default('no') }}
+{% if wrapuptime -%}
+wrapuptime={{ wrapuptime }}
+{% endif -%}
+{% if autopause -%}
+autopause={{ autopause }}
+{% endif -%}
+{% if autopausedelay -%}
+autopausedelay={{ autopausedelay }}
+{% endif -%}
+{% if autofill -%}
+autofill={{ autofill }}
+{% endif -%}
+{% if monitor_type -%}
+monitor-type={{ monitor_type }}
+{% endif -%}
+{% if monitor_format -%}
+monitor-format={{ monitor_format }}
+{% endif -%}
+{% if servicelevel -%}
+servicelevel={{ servicelevel }}
+{% endif -%}
+{% if weight -%}
+weight={{ weight }}
+{% endif -%}
+
+{% if members -%}
+; Queue Members
+{% for member in members -%}
+member => {{ member }}
+{% endfor -%}
+{% endif -%}

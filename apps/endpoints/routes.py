@@ -1,77 +1,86 @@
 # ============================================================================
-# apps/endpoints/pjsip_manager/api.py - Refactored PJSIP Configuration API
+# apps/endpoints/routes.py - Updated to Use Existing Schemas
 # ============================================================================
 
 from fastapi import APIRouter, HTTPException, Depends, Query, status
-from fastapi.responses import JSONResponse
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 import logging
+import asyncio
 
-from config import Settings
-from apps.endpoints.pjsip_manager.config_manager import ConfigManager
-from apps.endpoints.pjsip_manager.template_manager import TemplateManager
+# Import your existing schemas
 from .schemas import (
-    EndpointConfig, StructuredEndpoint, EndpointListResponse, 
-    EndpointFilters, SortOptions, EndpointTypeFilter, EndpointCreateRequest, EndpointUpdateRequest
+    StructuredEndpoint, EndpointListResponse, EndpointFilters, SortOptions,
+    EndpointTypeFilter, AudioMediaConfig, TransportNetworkConfig, RTPConfig,
+    RecordingConfig, CallConfig, PresenceConfig, VoicemailConfig, AuthConfig, AORConfig
 )
-from shared.models import ConfigGenerationResult
 
+# Global managers - will be set by main.py
+_template_manager = None
+_config_manager = None
+_settings = None
+
+logger = logging.getLogger(__name__)
 
 # Initialize router
 router = APIRouter(prefix="/api/v1/pjsip", tags=["PJSIP Configuration"])
-logger = logging.getLogger(__name__)
 
-# Global managers (will be initialized in startup)
-template_manager: Optional[TemplateManager] = None
-config_manager: Optional[ConfigManager] = None
-
+def set_managers(template_manager, config_manager, settings):
+    """Set the global managers (called from main.py)"""
+    global _template_manager, _config_manager, _settings
+    _template_manager = template_manager
+    _config_manager = config_manager
+    _settings = settings
+    logger.info("✅ PJSIP managers set successfully")
 
 # Dependency to get managers
 async def get_managers():
     """Dependency to get initialized managers"""
-    global template_manager, config_manager
-    if not template_manager or not config_manager:
-        raise HTTPException(status_code=500, detail="Managers not initialized")
-    return template_manager, config_manager
-
-
-# Startup function to initialize managers
-async def initialize_managers(settings: Settings):
-    """Initialize global managers"""
-    global template_manager, config_manager
-    try:
-        template_manager = TemplateManager(settings.template_dir)
-        config_manager = ConfigManager(settings, template_manager)
-        logger.info("PJSIP managers initialized successfully")
-    except Exception as e:
-        logger.error(f"Failed to initialize PJSIP managers: {e}")
-        raise
-
+    if not _template_manager or not _config_manager:
+        raise HTTPException(status_code=500, detail="PJSIP managers not initialized")
+    return _template_manager, _config_manager
 
 # ============================================================================
-# ENDPOINT ROUTES
+# Helper Functions to Parse Config into Existing Schema Format
+# ============================================================================
+
+async def parse_endpoint_to_structured(endpoint_id: str, config_manager) -> Optional[StructuredEndpoint]:
+    """Parse endpoint configuration into StructuredEndpoint using existing schema"""
+    try:
+        # Use the existing parse_endpoint_config method from config_manager
+        structured_endpoint = await config_manager.parse_endpoint_config(endpoint_id)
+        return structured_endpoint
+        
+    except Exception as e:
+        logger.warning(f"Failed to parse endpoint {endpoint_id}: {e}")
+        return None
+
+# ============================================================================
+# Enhanced Endpoint Routes Using Existing Schemas
 # ============================================================================
 
 @router.get("/endpoints", response_model=EndpointListResponse)
 async def list_endpoints(
     id: Optional[str] = Query(None, description="Filter by ID"),
     context: Optional[str] = Query(None, description="Filter by context"),
+    type: Optional[str] = Query(None, description="Filter by type (endpoint, trunk, webrtc)"),
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(50, ge=1, le=1000, description="Items per page"),
     sort_by: SortOptions = Query(SortOptions.ID_ASC, description="Sort order"),
     managers: tuple = Depends(get_managers)
 ) -> EndpointListResponse:
-    """List all endpoints with structured data (excludes trunks)"""
+    """List all endpoints with structured data using existing schemas"""
     _, config_manager = managers
     
     try:
+        # Create filters object
         filters = EndpointFilters(
             id=id,
             context=context,
-            type=EndpointTypeFilter.ENDPOINT
+            type=EndpointTypeFilter(type) if type else EndpointTypeFilter.ALL
         )
         
+        # Use the existing method from config_manager
         response = await config_manager.list_structured_endpoints_with_filters(
             filters=filters,
             sort_by=sort_by,
@@ -85,21 +94,22 @@ async def list_endpoints(
         logger.error(f"Failed to list endpoints: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to list endpoints: {e}")
 
-
 @router.get("/endpoints/{endpoint_id}", response_model=StructuredEndpoint)
 async def get_endpoint(
     endpoint_id: str,
     managers: tuple = Depends(get_managers)
 ) -> StructuredEndpoint:
-    """Get single endpoint details"""
+    """Get single endpoint with structured data using existing schema"""
     _, config_manager = managers
     
     try:
-        endpoint = await config_manager.parse_endpoint_config(endpoint_id)
-        if not endpoint:
+        # Use the existing parse_endpoint_config method
+        structured_endpoint = await config_manager.parse_endpoint_config(endpoint_id)
+        
+        if not structured_endpoint:
             raise HTTPException(status_code=404, detail=f"Endpoint '{endpoint_id}' not found")
         
-        return endpoint
+        return structured_endpoint
         
     except HTTPException:
         raise
@@ -107,92 +117,225 @@ async def get_endpoint(
         logger.error(f"Failed to get endpoint {endpoint_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get endpoint: {e}")
 
+# ============================================================================
+# Trunk Routes Using Existing Schemas
+# ============================================================================
 
-@router.post("/endpoints", response_model=ConfigGenerationResult, status_code=status.HTTP_201_CREATED)
+@router.get("/trunks", response_model=EndpointListResponse)
+async def list_trunks(
+    id: Optional[str] = Query(None, description="Filter by ID"),
+    accountcode: Optional[str] = Query(None, description="Filter by account code"),
+    page: int = Query(1, ge=1, description="Page number"),
+    page_size: int = Query(50, ge=1, le=1000, description="Items per page"),
+    sort_by: SortOptions = Query(SortOptions.ID_ASC, description="Sort order"),
+    managers: tuple = Depends(get_managers)
+) -> EndpointListResponse:
+    """List all trunks with structured data using existing schemas"""
+    _, config_manager = managers
+    
+    try:
+        # Create filters for trunks only
+        filters = EndpointFilters(
+            id=id,
+            accountcode=accountcode,
+            type=EndpointTypeFilter.TRUNK
+        )
+        
+        # Use the existing method from config_manager
+        response = await config_manager.list_structured_endpoints_with_filters(
+            filters=filters,
+            sort_by=sort_by,
+            page=page,
+            page_size=page_size
+        )
+        
+        return response
+        
+    except Exception as e:
+        logger.error(f"Failed to list trunks: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to list trunks: {e}")
+
+@router.get("/trunks/{trunk_id}", response_model=StructuredEndpoint)
+async def get_trunk(
+    trunk_id: str,
+    managers: tuple = Depends(get_managers)
+) -> StructuredEndpoint:
+    """Get single trunk with structured data using existing schema"""
+    _, config_manager = managers
+    
+    try:
+        # Use the existing parse_endpoint_config method
+        structured_endpoint = await config_manager.parse_endpoint_config(trunk_id)
+        
+        if not structured_endpoint:
+            raise HTTPException(status_code=404, detail=f"Trunk '{trunk_id}' not found")
+        
+        # Verify it's actually a trunk
+        endpoint_type = config_manager._determine_endpoint_type(structured_endpoint)
+        if endpoint_type != "trunk":
+            raise HTTPException(status_code=404, detail=f"'{trunk_id}' is not a trunk")
+        
+        return structured_endpoint
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get trunk {trunk_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get trunk: {e}")
+
+# ============================================================================
+# CRUD Operations (Create, Update, Delete)
+# ============================================================================
+
+# Request Models for CRUD operations
+class EndpointCreateRequest(BaseModel):
+    """Request model for creating endpoints"""
+    id: str = Field(..., description="Unique identifier", min_length=1, max_length=50)
+    template: str = Field(default="endpoint-basic", description="Template to use")
+    context: Optional[str] = Field(default="internal", description="Dialplan context")
+    callerid: Optional[str] = Field(None, description="Caller ID")
+    accountcode: Optional[str] = Field(None, description="Account code")
+    password: Optional[str] = Field(None, description="Password")
+    transport: Optional[str] = Field(default="transport-udp", description="Transport")
+    variables: Dict[str, Any] = Field(default_factory=dict, description="Additional variables")
+    auth_config: Optional[Dict[str, Any]] = Field(None, description="Auth configuration")
+    aor_config: Optional[Dict[str, Any]] = Field(None, description="AOR configuration")
+    transport_config: Optional[Dict[str, Any]] = Field(None, description="Transport configuration")
+    identify_config: Optional[Dict[str, Any]] = Field(None, description="Identify configuration")
+    registration_config: Optional[Dict[str, Any]] = Field(None, description="Registration configuration")
+
+class EndpointUpdateRequest(BaseModel):
+    """Request model for updating endpoints"""
+    id: Optional[str] = Field(None, description="New ID (if changing)")
+    template: Optional[str] = Field(None, description="Template")
+    context: Optional[str] = Field(None, description="Context")
+    callerid: Optional[str] = Field(None, description="Caller ID")
+    accountcode: Optional[str] = Field(None, description="Account code")
+    password: Optional[str] = Field(None, description="Password")
+    transport: Optional[str] = Field(None, description="Transport")
+    variables: Optional[Dict[str, Any]] = Field(None, description="Variables")
+    auth_config: Optional[Dict[str, Any]] = Field(None, description="Auth config")
+    aor_config: Optional[Dict[str, Any]] = Field(None, description="AOR config")
+    transport_config: Optional[Dict[str, Any]] = Field(None, description="Transport config")
+    identify_config: Optional[Dict[str, Any]] = Field(None, description="Identify configuration")
+    registration_config: Optional[Dict[str, Any]] = Field(None, description="Registration configuration")
+
+# Import your existing EndpointConfig from schemas
+from .schemas import EndpointConfig
+
+@router.post("/endpoints", status_code=status.HTTP_201_CREATED)
 async def create_endpoint(
     request: EndpointCreateRequest,
     managers: tuple = Depends(get_managers)
-) -> ConfigGenerationResult:
+):
     """Create a new endpoint"""
     _, config_manager = managers
     
     try:
-        endpoint_config = request.to_endpoint_config()
+        # Check if endpoint already exists
+        existing_endpoints = await config_manager.list_endpoint_configs()
+        if request.id in existing_endpoints:
+            raise HTTPException(
+                status_code=409, 
+                detail=f"Endpoint '{request.id}' already exists"
+            )
+        
+        # Create EndpointConfig using your existing schema
+        endpoint_config = EndpointConfig(
+            id=request.id,
+            template=request.template,
+            variables={
+                "context": request.context,
+                "callerid": request.callerid,
+                "accountcode": request.accountcode,
+                "password": request.password,
+                "transport": request.transport,
+                **request.variables
+            },
+            auth_config=request.auth_config,
+            aor_config=request.aor_config,
+            transport_config=request.transport_config,
+            identify_config=request.identify_config,
+            registration_config=request.registration_config
+        )
+        
+        # Use your existing generate_endpoint_config method
         result = await config_manager.generate_endpoint_config(endpoint_config)
         logger.info(f"Created endpoint: {request.id}")
-        return result
         
+        return {
+            "success": True,
+            "message": f"Endpoint '{request.id}' created successfully",
+            "endpoint_id": request.id,
+            "file_path": getattr(result, 'file_path', None)
+        }
+        
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Failed to create endpoint {request.id}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to create endpoint: {e}")
 
-
-@router.put("/endpoints/{endpoint_id}", response_model=ConfigGenerationResult)
+@router.put("/endpoints/{endpoint_id}")
 async def update_endpoint(
     endpoint_id: str,
     request: EndpointUpdateRequest,
     managers: tuple = Depends(get_managers)
-) -> ConfigGenerationResult:
-    """Update an endpoint (supports ID changes)"""
+):
+    """Update an endpoint"""
     _, config_manager = managers
     
     try:
-        # Get current endpoint
-        current_endpoint = await config_manager.parse_endpoint_config(endpoint_id)
-        if not current_endpoint:
+        # Check if endpoint exists
+        existing_endpoint = await config_manager.parse_endpoint_config(endpoint_id)
+        if not existing_endpoint:
             raise HTTPException(status_code=404, detail=f"Endpoint '{endpoint_id}' not found")
         
-        # Check if ID is being changed
+        # Create updated EndpointConfig
         new_id = request.id or endpoint_id
-        id_changed = new_id != endpoint_id
+        variables = {}
         
-        # If ID is changing, check if the new ID already exists
-        if id_changed:
-            existing_endpoint = await config_manager.parse_endpoint_config(new_id)
-            if existing_endpoint:
-                raise HTTPException(status_code=409, detail=f"Endpoint with ID '{new_id}' already exists")
+        if request.context is not None:
+            variables["context"] = request.context
+        if request.callerid is not None:
+            variables["callerid"] = request.callerid
+        if request.accountcode is not None:
+            variables["accountcode"] = request.accountcode
+        if request.password is not None:
+            variables["password"] = request.password
+        if request.transport is not None:
+            variables["transport"] = request.transport
+        if request.variables:
+            variables.update(request.variables)
         
-        # Convert request to EndpointConfig
-        endpoint_config = request.to_endpoint_config(
-            new_id, 
-            current_endpoint.template_used or "endpoint-basic"
+        endpoint_config = EndpointConfig(
+            id=new_id,
+            template=request.template or "endpoint-basic",
+            variables=variables,
+            auth_config=request.auth_config,
+            aor_config=request.aor_config,
+            transport_config=request.transport_config,
+            identify_config=request.identify_config,
+            registration_config=request.registration_config
         )
         
-        # Auto-update caller ID and mailboxes if ID changed
-        if id_changed and endpoint_config.variables:
-            variables = endpoint_config.variables.copy()
-            
-            # Update caller ID if it contains the old ID
-            if variables.get("callerid"):
-                callerid = variables["callerid"]
-                if f"<{endpoint_id}>" in callerid:
-                    variables["callerid"] = callerid.replace(f"<{endpoint_id}>", f"<{new_id}>")
-                elif endpoint_id in callerid and new_id not in callerid:
-                    variables["callerid"] = callerid.replace(endpoint_id, new_id)
-            
-            # Update mailboxes if they contain the old ID
-            if variables.get("mailboxes"):
-                mailboxes = variables["mailboxes"]
-                if f"{endpoint_id}@" in mailboxes:
-                    variables["mailboxes"] = mailboxes.replace(f"{endpoint_id}@", f"{new_id}@")
-            
-            endpoint_config.variables = variables
-        
-        # Generate the new/updated configuration
+        # Use your existing generate_endpoint_config method
         result = await config_manager.generate_endpoint_config(endpoint_config)
         
-        # If ID changed, delete the old endpoint configuration
-        if id_changed:
-            delete_success = await config_manager.delete_endpoint_config(endpoint_id)
-            if not delete_success:
-                logger.warning(f"Failed to delete old endpoint '{endpoint_id}' after ID change")
-            else:
-                logger.info(f"Deleted old endpoint '{endpoint_id}' after changing ID to '{new_id}'")
+        # If ID changed, delete old config
+        if new_id != endpoint_id:
+            await config_manager.delete_endpoint_config(endpoint_id)
         
         logger.info(f"Updated endpoint: {endpoint_id} -> {new_id}")
-        return result
+        
+        return {
+            "success": True,
+            "message": f"Endpoint '{new_id}' updated successfully",
+            "endpoint_id": new_id,
+            "file_path": getattr(result, 'file_path', None)
+        }
         
     except HTTPException:
         raise
@@ -201,7 +344,6 @@ async def update_endpoint(
     except Exception as e:
         logger.error(f"Failed to update endpoint {endpoint_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to update endpoint: {e}")
-
 
 @router.delete("/endpoints/{endpoint_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_endpoint(
@@ -224,239 +366,144 @@ async def delete_endpoint(
         logger.error(f"Failed to delete endpoint {endpoint_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to delete endpoint: {e}")
 
-
 # ============================================================================
-# TRUNK ROUTES
+# Trunk CRUD Operations
 # ============================================================================
 
-@router.get("/trunks", response_model=EndpointListResponse)
-async def list_trunks(
-    id: Optional[str] = Query(None, description="Filter by ID"),
-    accountcode: Optional[str] = Query(None, description="Filter by account code"),
-    page: int = Query(1, ge=1, description="Page number"),
-    page_size: int = Query(50, ge=1, le=1000, description="Items per page"),
-    sort_by: SortOptions = Query(SortOptions.ID_ASC, description="Sort order"),
-    managers: tuple = Depends(get_managers)
-) -> EndpointListResponse:
-    """List all trunks with structured data"""
-    _, config_manager = managers
-    
-    try:
-        filters = EndpointFilters(
-            id=id,
-            accountcode=accountcode,
-            type=EndpointTypeFilter.TRUNK
-        )
-        
-        response = await config_manager.list_structured_endpoints_with_filters(
-            filters=filters,
-            sort_by=sort_by,
-            page=page,
-            page_size=page_size
-        )
-        
-        return response
-        
-    except Exception as e:
-        logger.error(f"Failed to list trunks: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to list trunks: {e}")
-
-
-@router.get("/trunks/{trunk_id}", response_model=StructuredEndpoint)
-async def get_trunk(
-    trunk_id: str,
-    managers: tuple = Depends(get_managers)
-) -> StructuredEndpoint:
-    """Get single trunk details"""
-    _, config_manager = managers
-    
-    try:
-        trunk = await config_manager.parse_endpoint_config(trunk_id)
-        if not trunk:
-            raise HTTPException(status_code=404, detail=f"Trunk '{trunk_id}' not found")
-        
-        # Verify it's actually a trunk
-        trunk_type = config_manager._determine_endpoint_type(trunk)
-        if trunk_type != "trunk":
-            raise HTTPException(status_code=404, detail=f"'{trunk_id}' is not a trunk")
-        
-        return trunk
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to get trunk {trunk_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get trunk: {e}")
-
-
-@router.post("/trunks", response_model=ConfigGenerationResult, status_code=status.HTTP_201_CREATED)
+@router.post("/trunks", status_code=status.HTTP_201_CREATED)
 async def create_trunk(
     request: EndpointCreateRequest,
     managers: tuple = Depends(get_managers)
-) -> ConfigGenerationResult:
+):
     """Create a new trunk"""
     _, config_manager = managers
     
     try:
-        # Force trunk template if not specified
+        # Force trunk template and context
         if not request.template or "trunk" not in request.template.lower():
             request.template = "endpoint-trunk"
         
-        # Force trunk context if not specified
         if not request.context or request.context == "internal":
             request.context = "from-trunk"
         
-        # Add identify and registration configs for trunks
-        endpoint_config = request.to_endpoint_config()
+        # Check if trunk already exists
+        existing_endpoints = await config_manager.list_endpoint_configs()
+        if request.id in existing_endpoints:
+            raise HTTPException(
+                status_code=409, 
+                detail=f"Trunk '{request.id}' already exists"
+            )
         
-        # Add identify configuration
-        if not endpoint_config.identify_config:
-            endpoint_config.identify_config = {
+        # Create trunk EndpointConfig with identify and registration
+        endpoint_config = EndpointConfig(
+            id=request.id,
+            template=request.template,
+            variables={
+                "context": request.context,
+                "callerid": request.callerid,
+                "accountcode": request.accountcode,
+                "password": request.password,
+                "transport": request.transport,
+                **request.variables
+            },
+            auth_config=request.auth_config,
+            aor_config=request.aor_config,
+            transport_config=request.transport_config,
+            identify_config=request.identify_config or {
                 "template": "identify-basic",
-                "match": request.variables.get("match", "")  # IP or pattern to match
-            }
-        
-        # Add registration configuration  
-        if not endpoint_config.registration_config:
-            endpoint_config.registration_config = {
+                "identify_id": f"{request.id}-identify",
+                "endpoint": request.id,
+                "match": request.variables.get("match", "")
+            },
+            registration_config=request.registration_config or {
                 "template": "registration-basic",
+                "registration_id": f"{request.id}-reg",
+                "transport": request.transport or "transport-udp",
+                "outbound_auth": f"{request.id}-auth",
                 "server_uri": request.variables.get("server_uri", ""),
                 "client_uri": request.variables.get("client_uri", "")
             }
+        )
         
         result = await config_manager.generate_endpoint_config(endpoint_config)
         logger.info(f"Created trunk: {request.id}")
-        return result
         
+        return {
+            "success": True,
+            "message": f"Trunk '{request.id}' created successfully",
+            "trunk_id": request.id,
+            "file_path": getattr(result, 'file_path', None)
+        }
+        
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Failed to create trunk {request.id}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to create trunk: {e}")
 
+# ============================================================================
+# Template and Summary Routes
+# ============================================================================
 
-@router.put("/trunks/{trunk_id}", response_model=ConfigGenerationResult)
-async def update_trunk(
-    trunk_id: str,
-    request: EndpointUpdateRequest,
-    managers: tuple = Depends(get_managers)
-) -> ConfigGenerationResult:
-    """Update a trunk (supports ID changes)"""
+@router.get("/templates")
+async def list_templates(managers: tuple = Depends(get_managers)):
+    """List available templates"""
+    template_manager, _ = managers
+    
+    try:
+        templates = await template_manager.list_templates()
+        # Filter for PJSIP templates only
+        pjsip_templates = [t for t in templates if any(keyword in t for keyword in ['endpoint', 'auth', 'aor', 'trunk', 'transport', 'identify', 'registration'])]
+        return {"templates": pjsip_templates}
+    except Exception as e:
+        logger.error(f"Failed to list templates: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to list templates: {e}")
+
+@router.get("/summary")
+async def get_endpoints_summary(managers: tuple = Depends(get_managers)):
+    """Get summary statistics for all endpoints"""
     _, config_manager = managers
     
     try:
-        # Get current trunk
-        current_trunk = await config_manager.parse_endpoint_config(trunk_id)
-        if not current_trunk:
-            raise HTTPException(status_code=404, detail=f"Trunk '{trunk_id}' not found")
-        
-        # Verify it's actually a trunk
-        trunk_type = config_manager._determine_endpoint_type(current_trunk)
-        if trunk_type != "trunk":
-            raise HTTPException(status_code=404, detail=f"'{trunk_id}' is not a trunk")
-        
-        # Check if ID is being changed
-        new_id = request.id or trunk_id
-        id_changed = new_id != trunk_id
-        
-        # If ID is changing, check if the new ID already exists
-        if id_changed:
-            existing_endpoint = await config_manager.parse_endpoint_config(new_id)
-            if existing_endpoint:
-                raise HTTPException(status_code=409, detail=f"Endpoint with ID '{new_id}' already exists")
-        
-        # Force trunk template if being changed to non-trunk
-        if request.template and "trunk" not in request.template.lower():
-            request.template = "endpoint-trunk"
-        
-        # Force trunk context if being changed to internal
-        if request.context == "internal":
-            request.context = "from-trunk"
-        
-        # Convert request to EndpointConfig
-        endpoint_config = request.to_endpoint_config(
-            new_id, 
-            current_trunk.template_used or "endpoint-trunk"
+        # Use existing method to get all endpoints
+        filters = EndpointFilters(type=EndpointTypeFilter.ALL)
+        response = await config_manager.list_structured_endpoints_with_filters(
+            filters=filters,
+            sort_by=SortOptions.ID_ASC,
+            page=1,
+            page_size=1000  # Get all endpoints
         )
         
-        # Auto-update caller ID and mailboxes if ID changed
-        if id_changed and endpoint_config.variables:
-            variables = endpoint_config.variables.copy()
+        endpoints = response.endpoints
+        total_endpoints = len(endpoints)
+        
+        # Calculate statistics
+        endpoints_by_type = {}
+        endpoints_by_context = {}
+        
+        for endpoint in endpoints:
+            # Count by type (use existing type determination)
+            endpoint_type = config_manager._determine_endpoint_type(endpoint)
+            endpoints_by_type[endpoint_type] = endpoints_by_type.get(endpoint_type, 0) + 1
             
-            # Update caller ID if it contains the old ID
-            if variables.get("callerid"):
-                callerid = variables["callerid"]
-                if f"<{trunk_id}>" in callerid:
-                    variables["callerid"] = callerid.replace(f"<{trunk_id}>", f"<{new_id}>")
-                elif trunk_id in callerid and new_id not in callerid:
-                    variables["callerid"] = callerid.replace(trunk_id, new_id)
-            
-            endpoint_config.variables = variables
+            # Count by context
+            context = endpoint.call.context if endpoint.call else "unknown"
+            endpoints_by_context[context] = endpoints_by_context.get(context, 0) + 1
         
-        # Generate the new/updated configuration
-        result = await config_manager.generate_endpoint_config(endpoint_config)
+        return {
+            "total_endpoints": total_endpoints,
+            "endpoints_by_type": endpoints_by_type,
+            "endpoints_by_context": endpoints_by_context,
+            "features": {
+                "with_auth": len([ep for ep in endpoints if ep.auth]),
+                "with_aor": len([ep for ep in endpoints if ep.aor]),
+                "with_recording": len([ep for ep in endpoints if ep.recording and ep.recording.record_calls == "yes"]),
+                "with_voicemail": len([ep for ep in endpoints if ep.voicemail and ep.voicemail.mailboxes])
+            }
+        }
         
-        # If ID changed, delete the old trunk configuration
-        if id_changed:
-            delete_success = await config_manager.delete_endpoint_config(trunk_id)
-            if not delete_success:
-                logger.warning(f"Failed to delete old trunk '{trunk_id}' after ID change")
-            else:
-                logger.info(f"Deleted old trunk '{trunk_id}' after changing ID to '{new_id}'")
-        
-        logger.info(f"Updated trunk: {trunk_id} -> {new_id}")
-        return result
-        
-    except HTTPException:
-        raise
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to update trunk {trunk_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to update trunk: {e}")
-
-
-@router.delete("/trunks/{trunk_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_trunk(
-    trunk_id: str,
-    managers: tuple = Depends(get_managers)
-):
-    """Delete a trunk"""
-    _, config_manager = managers
-    
-    try:
-        # Verify it's actually a trunk before deleting
-        trunk = await config_manager.parse_endpoint_config(trunk_id)
-        if not trunk:
-            raise HTTPException(status_code=404, detail=f"Trunk '{trunk_id}' not found")
-        
-        trunk_type = config_manager._determine_endpoint_type(trunk)
-        if trunk_type != "trunk":
-            raise HTTPException(status_code=404, detail=f"'{trunk_id}' is not a trunk")
-        
-        success = await config_manager.delete_endpoint_config(trunk_id)
-        if not success:
-            raise HTTPException(status_code=404, detail=f"Trunk '{trunk_id}' not found")
-        
-        logger.info(f"Deleted trunk: {trunk_id}")
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to delete trunk {trunk_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to delete trunk: {e}")
-
-
-# Exception handler functions (to be registered with the main app)
-async def value_error_handler(request, exc):
-    return JSONResponse(
-        status_code=400,
-        content={"detail": str(exc), "type": "validation_error"}
-    )
-
-
-async def file_not_found_handler(request, exc):
-    return JSONResponse(
-        status_code=404,
-        content={"detail": "Resource not found", "type": "not_found"}
-    )
+        logger.error(f"Failed to get endpoints summary: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get summary: {e}")
